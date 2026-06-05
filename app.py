@@ -302,8 +302,15 @@ def _handle_send(user_input: str) -> None:
         groq_api_key=Config.GROQ_API_KEY,
     )
     try:
-        with st.chat_message("assistant"):
-            response_text = st.write_stream(stream_gen)
+        # Consume the stream silently first so we know the full response
+        collected_chunks = []
+        for chunk in stream_gen:
+            collected_chunks.append(chunk)
+        response_text = "".join(collected_chunks)
+        # Only render the assistant bubble if there is actual visible content
+        if response_text.strip():
+            with st.chat_message("assistant"):
+                st.markdown(response_text)
     except Exception as exc:
         _push("ERROR — Groq API", str(exc), status="error")
         st.error(f"Inference failed: {exc}")

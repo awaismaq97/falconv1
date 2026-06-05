@@ -1,18 +1,4 @@
-"""
-Unit tests for falcon/identity.py.
 
-Covers:
-- load_history returns [] for non-existent identity (REQ 1.4)
-- load_history raises json.JSONDecodeError for corrupted file without modifying it (REQ 1.6)
-- load_history returns entries in chronological order (REQ 1.5)
-- load_history returns a copy, not a reference (design spec)
-- clear_identity removes only the target identity file (REQ 1.2)
-- clear_identity is a no-op for a non-existent identity (REQ 1.2)
-- list_identities reflects only existing log files (REQ 1.3, 1.8)
-- Path-traversal identity_id raises ValueError (REQ 8.1, 8.2)
-
-Requirements: 1.1–1.7, 8.1, 8.2
-"""
 
 import json
 import os
@@ -384,7 +370,7 @@ class TestPathTraversalValidation:
 
 
 # ---------------------------------------------------------------------------
-# REQ 1.1: Cross-identity isolation — append + load other identity
+#  Cross-identity isolation — append + load other identity
 # ---------------------------------------------------------------------------
 
 class TestCrossIdentityIsolation:

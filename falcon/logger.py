@@ -73,22 +73,22 @@ def append_message(identity_id: str, role: str, content: str) -> None:
         ValueError: If role is not "user" or "assistant".
         json.JSONDecodeError: If the existing log file exists but is not valid JSON.
     """
-    # REQ 8.1 / 8.2 — reject dangerous identity_id values before any path work
+    #  — reject dangerous identity_id values before any path work
     _validate_identity_id(identity_id)
 
-    # REQ 3.6 — validate role before any I/O
+    #  validate role before any I/O
     if role not in ("user", "assistant"):
         raise ValueError(
             f"role must be 'user' or 'assistant', got: {role!r}"
         )
 
-    # REQ 3.7 — ensure the logs directory exists
+    #  ensure the logs directory exists
     log_dir = _LOG_DIR
     os.makedirs(log_dir, exist_ok=True)
 
     log_path = os.path.join(log_dir, f"{identity_id}.json")
 
-    # REQ 3.8 — read existing entries; raise JSONDecodeError for corrupt files
+    #  read existing entries; raise JSONDecodeError for corrupt files
     if os.path.exists(log_path):
         with open(log_path, "r", encoding="utf-8") as fh:
             raw = fh.read()
@@ -97,7 +97,7 @@ def append_message(identity_id: str, role: str, content: str) -> None:
     else:
         entries = []
 
-    # REQ 3.4 / 3.5 — build the new entry with exactly three fields
+    #  build the new entry with exactly three fields
     entry = {
         "timestamp": _utc_now_iso(),
         "role": role,
@@ -106,6 +106,6 @@ def append_message(identity_id: str, role: str, content: str) -> None:
 
     entries.append(entry)
 
-    # REQ 3.1 / 3.2 / 3.3 — write the full array back so the file is valid JSON
+    #  write the full array back so the file is valid JSON
     with open(log_path, "w", encoding="utf-8") as fh:
         json.dump(entries, fh, indent=2, ensure_ascii=False)

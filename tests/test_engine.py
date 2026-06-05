@@ -1,11 +1,4 @@
-"""
-Unit tests for falcon/engine.py.
 
-Covers:
-- build_payload with and without system prompt (REQ 2.1–2.5, 4.1–4.3)
-- run_inference returns correct dict structure with mocked ChatGroq (REQ 2.1–2.5, 4.1–4.3)
-- run_inference propagates ChatGroq exceptions to the caller
-"""
 
 from unittest.mock import MagicMock, patch
 

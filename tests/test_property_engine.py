@@ -1,12 +1,4 @@
-"""
-Property-based tests for engine.py.
 
-Property 2: Payload Transparency  (task 6.2)
-  Validates: Requirements 2.1, 2.2, 2.3, 2.4, 2.5
-
-Property 4: Neutrality  (task 6.3)
-  Validates: Requirements 4.1, 4.2, 4.3, 4.7
-"""
 
 from hypothesis import HealthCheck, given, settings
 from hypothesis import strategies as st
@@ -43,14 +35,13 @@ message_list = st.lists(message_dict, min_size=0, max_size=20)
 
 # ---------------------------------------------------------------------------
 # Property 2: Payload Transparency
-# Validates: Requirements 2.1, 2.2, 2.3, 2.4, 2.5
 # ---------------------------------------------------------------------------
 
 @given(system_prompt=non_empty_prompt, messages=message_list)
 @settings(max_examples=100, suppress_health_check=[HealthCheck.function_scoped_fixture])
 def test_non_empty_prompt_is_first_entry(system_prompt: str, messages: list[dict]):
     """
-    REQ 2.1: When system_prompt is non-empty, raw_payload[0] == {"role": "system", "content": system_prompt}
+      2.1: When system_prompt is non-empty, raw_payload[0] == {"role": "system", "content": system_prompt}
     with content equal to system_prompt without any modification.
     """
     payload = build_payload(system_prompt, messages)
@@ -65,7 +56,7 @@ def test_non_empty_prompt_is_first_entry(system_prompt: str, messages: list[dict
 @settings(max_examples=100, suppress_health_check=[HealthCheck.function_scoped_fixture])
 def test_empty_or_whitespace_prompt_has_no_system_entry(system_prompt: str, messages: list[dict]):
     """
-    REQ 2.2 / REQ 2.5: When system_prompt is empty or whitespace-only,
+      2.2 /   2.5: When system_prompt is empty or whitespace-only,
     no entry with role == "system" appears in the payload.
     """
     payload = build_payload(system_prompt, messages)
@@ -80,7 +71,7 @@ def test_empty_or_whitespace_prompt_has_no_system_entry(system_prompt: str, mess
 @settings(max_examples=100, suppress_health_check=[HealthCheck.function_scoped_fixture])
 def test_user_and_assistant_messages_preserved_in_order(system_prompt: str, messages: list[dict]):
     """
-    REQ 2.3: All user/assistant messages appear in payload in the same order
+      2.3: All user/assistant messages appear in payload in the same order
     with identical content values.
     """
     payload = build_payload(system_prompt, messages)
@@ -103,7 +94,7 @@ def test_user_and_assistant_messages_preserved_in_order(system_prompt: str, mess
 @settings(max_examples=100, suppress_health_check=[HealthCheck.function_scoped_fixture])
 def test_payload_length_equals_messages_plus_system_flag(system_prompt: str, messages: list[dict]):
     """
-    REQ 2.4: len(payload) == len(messages) + (1 if system_prompt.strip() else 0).
+      2.4: len(payload) == len(messages) + (1 if system_prompt.strip() else 0).
     """
     payload = build_payload(system_prompt, messages)
     expected_len = len(messages) + (1 if system_prompt.strip() else 0)
@@ -114,15 +105,14 @@ def test_payload_length_equals_messages_plus_system_flag(system_prompt: str, mes
 
 
 # ---------------------------------------------------------------------------
-# Property 4: Neutrality
-# Validates: Requirements 4.1, 4.2, 4.3, 4.7
+
 # ---------------------------------------------------------------------------
 
 @given(messages=message_list)
 @settings(max_examples=100, suppress_health_check=[HealthCheck.function_scoped_fixture])
 def test_empty_prompt_produces_no_system_entry(messages: list[dict]):
     """
-    REQ 4.1: build_payload("", messages) must return exactly len(messages)
+      4.1: build_payload("", messages) must return exactly len(messages)
     entries with no system entry.
     """
     payload = build_payload("", messages)
@@ -138,7 +128,7 @@ def test_empty_prompt_produces_no_system_entry(messages: list[dict]):
 @settings(max_examples=100, suppress_health_check=[HealthCheck.function_scoped_fixture])
 def test_whitespace_only_prompt_produces_no_system_entry(system_prompt: str, messages: list[dict]):
     """
-    REQ 4.1: build_payload(whitespace_only_prompt, messages) must return
+      4.1: build_payload(whitespace_only_prompt, messages) must return
     exactly len(messages) entries with no system entry.
     """
     payload = build_payload(system_prompt, messages)
@@ -154,7 +144,7 @@ def test_whitespace_only_prompt_produces_no_system_entry(system_prompt: str, mes
 @settings(max_examples=100, suppress_health_check=[HealthCheck.function_scoped_fixture])
 def test_message_content_is_not_modified(system_prompt: str, messages: list[dict]):
     """
-    REQ 4.3: Every HumanMessage/AIMessage content in the payload equals the
+      4.3: Every HumanMessage/AIMessage content in the payload equals the
     input string with zero modification — no prefix, suffix, or whitespace normalization.
     """
     payload = build_payload(system_prompt, messages)
@@ -170,7 +160,7 @@ def test_message_content_is_not_modified(system_prompt: str, messages: list[dict
 @settings(max_examples=100, suppress_health_check=[HealthCheck.function_scoped_fixture])
 def test_system_prompt_content_not_modified(system_prompt: str, messages: list[dict]):
     """
-    REQ 4.2: When system_prompt is non-empty, the system entry's content
+      4.2: When system_prompt is non-empty, the system entry's content
     must equal system_prompt with no modification, prefix, suffix, or
     whitespace normalization.
     """

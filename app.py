@@ -302,15 +302,11 @@ def _handle_send(user_input: str) -> None:
         groq_api_key=Config.GROQ_API_KEY,
     )
     try:
-        # Consume the stream silently first so we know the full response
-        collected_chunks = []
+        # Consume the stream silently first so we capture the full response and usage
+        chunks = []
         for chunk in stream_gen:
-            collected_chunks.append(chunk)
-        response_text = "".join(collected_chunks)
-        # Only render the assistant bubble if there is actual visible content
-        if response_text.strip():
-            with st.chat_message("assistant"):
-                st.markdown(response_text)
+            chunks.append(chunk)
+        response_text = "".join(chunks)
     except Exception as exc:
         _push("ERROR — Groq API", str(exc), status="error")
         st.error(f"Inference failed: {exc}")
@@ -318,6 +314,11 @@ def _handle_send(user_input: str) -> None:
         st.session_state.trace_log = trace
         return
     api_latency_ms = round((time.monotonic() - api_t0) * 1000)
+
+    # Only render the assistant bubble if the model produced visible content
+    if response_text.strip():
+        with st.chat_message("assistant"):
+            st.markdown(response_text)
 
     _push("← response complete", {"latency_ms": api_latency_ms, "content": response_text})
 

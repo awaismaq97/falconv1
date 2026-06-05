@@ -104,7 +104,16 @@ available_models:
   - "qwen/qwen3-32b"
   - "meta-llama/llama-4-scout-17b-16e-instruct"
 
-default_system_prompt: ""   # empty = no system message sent
+default_system_prompt: "You are a neutral text-processing interface. "
+    "Respond only to what is explicitly asked. "
+    "Do not add explanations, caveats, suggestions, offers of further help, "
+    "affirmations, apologies, or any framing language. "
+    "Do not refer to yourself as an AI, assistant, or language model. "
+    "Do not begin responses with filler phrases such as 'Certainly', 'Of course', "
+    "'Sure', 'Great', 'Absolutely', or similar. "
+    "Output only the direct answer or result. "
+    "If the input is ambiguous, respond with the most literal interpretation. "
+    "Use the minimum number of words necessary to be complete and accurate."
 
 log_dir: "logs"
 ```
@@ -205,9 +214,7 @@ Each entry has exactly three fields: `timestamp` (ISO 8601 UTC), `role`, `conten
 
 The following rules are enforced at every layer of the system:
 
-- The default system prompt is an **empty string** — no pre-filled instructions.
-- What you type in the system prompt field is sent to the model **exactly as typed**. Nothing is added, removed, or reformatted.
-- If the system prompt is empty, **no system message is sent** to the model at all.
+- The default system prompt is set in falcon/config.py file.
 - The engine adds **zero** hidden context — `build_payload()` is the authoritative, inspectable record of what goes to Groq.
 - The `<think>...</think>` filter strips chain-of-thought blocks from reasoning models (e.g. Qwen3) before they reach the UI — the model's reasoning is not echoed.
 
@@ -264,7 +271,3 @@ streamlit run app.py
 No Docker, no migrations, no build steps.
 
 ---
-
-## License
-
-Private / internal use. See repository owner for licensing terms.

@@ -302,11 +302,8 @@ def _handle_send(user_input: str) -> None:
         groq_api_key=Config.GROQ_API_KEY,
     )
     try:
-        # Consume the stream silently first so we capture the full response and usage
-        chunks = []
-        for chunk in stream_gen:
-            chunks.append(chunk)
-        response_text = "".join(chunks)
+        with st.chat_message("assistant"):
+            response_text = st.write_stream(stream_gen)
     except Exception as exc:
         _push("ERROR — Groq API", str(exc), status="error")
         st.error(f"Inference failed: {exc}")
@@ -314,11 +311,6 @@ def _handle_send(user_input: str) -> None:
         st.session_state.trace_log = trace
         return
     api_latency_ms = round((time.monotonic() - api_t0) * 1000)
-
-    # Only render the assistant bubble if the model produced visible content
-    if response_text.strip():
-        with st.chat_message("assistant"):
-            st.markdown(response_text)
 
     _push("← response complete", {"latency_ms": api_latency_ms, "content": response_text})
 
@@ -429,9 +421,6 @@ def _render_chat_tab(user_input: str | None) -> None:
     else:
         # ── Render existing history ───────────────────────────────────────────
         for entry in history:
-            # Skip assistant entries with no visible content
-            if entry.get("role") == "assistant" and not entry.get("content", "").strip():
-                continue
             with st.chat_message(entry.get("role", "user")):
                 st.markdown(entry.get("content", ""))
 

@@ -25,12 +25,12 @@ def build_payload(system_prompt: str, messages: list[dict]) -> list[dict]:
 
     Behaviour:
     - If `system_prompt` is non-empty and not whitespace-only, prepends one entry
-      with role="system" and content=system_prompt, with no modification.
+      with role="system" and content=system_prompt, with no modification (REQ 2.1).
     - If `system_prompt` is empty or whitespace-only, no system entry is included
-      in the returned list.
+      in the returned list (REQ 2.2, REQ 2.5, REQ 4.1).
     - All entries from `messages` are included in their original order with their
-      content values unchanged.
-    - Total length equals len(messages) + (1 if system_prompt.strip() else 0).
+      content values unchanged (REQ 2.3, REQ 4.3).
+    - Total length equals len(messages) + (1 if system_prompt.strip() else 0) (REQ 2.4).
 
     Args:
         system_prompt: The system prompt string. May be empty.
@@ -42,10 +42,10 @@ def build_payload(system_prompt: str, messages: list[dict]) -> list[dict]:
     payload: list[dict] = []
 
     if system_prompt and system_prompt.strip():
-        # include system entry only when non-empty / non-whitespace
+        # REQ 2.1, REQ 4.2 — include system entry only when non-empty / non-whitespace
         payload.append({"role": "system", "content": system_prompt})
 
-    # copy messages verbatim; do not normalise content
+    # REQ 2.3, REQ 4.3 — copy messages verbatim; do not normalise content
     for message in messages:
         payload.append({"role": message["role"], "content": message["content"]})
 
@@ -83,7 +83,6 @@ def run_inference(
         temperature=0,
         top_p=1,
         stop_sequences=None,
-        max_tokens=1,
     )
 
     result = llm.invoke(lc_messages)
@@ -140,7 +139,6 @@ class _StreamResult:
             temperature=0,
             top_p=1,
             stop_sequences=None,
-            max_tokens=1,
         )
 
         # State machine for stripping <think>...</think> blocks mid-stream.

@@ -83,6 +83,7 @@ def run_inference(
         temperature=0,
         top_p=1,
         stop_sequences=None,
+        max_tokens=1,
     )
 
     result = llm.invoke(lc_messages)
@@ -139,6 +140,7 @@ class _StreamResult:
             temperature=0,
             top_p=1,
             stop_sequences=None,
+            max_tokens=1,
         )
 
         # State machine for stripping <think>...</think> blocks mid-stream.

@@ -1,7 +1,6 @@
 """
 Property-based tests for config.py — Property 5: Config Completeness.
 
-Validates: Requirements 5.1, 5.2, 5.3
 
 Because config.py executes validation at import time (module-level code),
 each test must evict `falcon.config` from `sys.modules` and reload it with
@@ -108,7 +107,6 @@ invalid_field_strategy = st.one_of(
 # ---------------------------------------------------------------------------
 # Property 5a — GROQ_API_KEY absent raises ValueError
 #
-# Validates: Requirement 5.1
 # ---------------------------------------------------------------------------
 
 def test_missing_api_key_raises():
@@ -121,8 +119,6 @@ def test_missing_api_key_raises():
 @settings(suppress_health_check=[HealthCheck.function_scoped_fixture], max_examples=50)
 def test_invalid_api_key_raises_value_error(key):
     """
-    **Validates: Requirements 5.1**
-
     For any empty or whitespace-only GROQ_API_KEY value, config.py must
     raise ValueError before exposing any configuration.
     """
@@ -132,9 +128,7 @@ def test_invalid_api_key_raises_value_error(key):
 
 
 # ---------------------------------------------------------------------------
-# Property 5b — Successful load exposes correct flat namespace
-#
-# Validates: Requirement 5.2
+
 # ---------------------------------------------------------------------------
 
 @given(
@@ -145,7 +139,6 @@ def test_invalid_api_key_raises_value_error(key):
 @settings(suppress_health_check=[HealthCheck.function_scoped_fixture], max_examples=50)
 def test_successful_load_exposes_valid_namespace(api_key, model, log_dir):
     """
-    **Validates: Requirements 5.2**
 
     After a successful load:
     - default_model is a non-empty string
@@ -172,16 +165,13 @@ def test_successful_load_exposes_valid_namespace(api_key, model, log_dir):
 
 
 # ---------------------------------------------------------------------------
-# Property 5c — Missing/invalid required YAML fields raise ValueError
-#
-# Validates: Requirement 5.3
+
 # ---------------------------------------------------------------------------
 
 @given(bad_value=invalid_field_strategy)
 @settings(suppress_health_check=[HealthCheck.function_scoped_fixture], max_examples=50)
 def test_invalid_default_model_raises_value_error(bad_value):
     """
-    **Validates: Requirements 5.3**
 
     If default_model is absent, empty, whitespace-only, or a non-string,
     config.py must raise ValueError.
@@ -200,7 +190,6 @@ def test_invalid_default_model_raises_value_error(bad_value):
 @settings(suppress_health_check=[HealthCheck.function_scoped_fixture], max_examples=50)
 def test_invalid_log_dir_raises_value_error(bad_value):
     """
-    **Validates: Requirements 5.3**
 
     If log_dir is absent, empty, whitespace-only, or a non-string,
     config.py must raise ValueError.

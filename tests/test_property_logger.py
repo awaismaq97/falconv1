@@ -1,7 +1,6 @@
 """
 Property-based tests for Log Integrity (Property 3).
 
-**Validates: Requirements 3.1, 3.2, 3.3, 3.4, 3.5**
 
 Property 3: Log Integrity
   - After every call to append_message(identity_id, ...), logs/{identity_id}.json
@@ -57,15 +56,14 @@ def test_log_integrity(identity_id: str, messages: list[tuple[str, str]]):
     """
     Property 3: Log Integrity
 
-    **Validates: Requirements 3.1, 3.2, 3.3, 3.4, 3.5**
 
     For any sequence of (role, content) pairs appended to the same identity:
-    1. The log file parses as valid JSON after each append (REQ 3.1).
-    2. Prior entries' timestamp, role, content are not mutated (REQ 3.2).
+    1. The log file parses as valid JSON after each append (  3.1).
+    2. Prior entries' timestamp, role, content are not mutated (  3.2).
     3. After N appends, load_history returns exactly N entries in insertion
-       order (REQ 3.3).
-    4. Each entry has exactly 3 fields: timestamp, role, content (REQ 3.4).
-    5. Timestamp is an ISO 8601 UTC string ending with 'Z' (REQ 3.5).
+       order (  3.3).
+    4. Each entry has exactly 3 fields: timestamp, role, content (  3.4).
+    5. Timestamp is an ISO 8601 UTC string ending with 'Z' (  3.5).
     """
     with tempfile.TemporaryDirectory() as tmp_dir:
         # Redirect both logger and identity modules to the same isolated temp dir
@@ -81,7 +79,7 @@ def test_log_integrity(identity_id: str, messages: list[tuple[str, str]]):
             for i, (role, content) in enumerate(messages):
                 append_message(identity_id, role, content)
 
-                # --- REQ 3.1: file parses as valid JSON after every write ---
+                # ---   3.1: file parses as valid JSON after every write ---
                 assert os.path.exists(log_file), (
                     f"Log file does not exist after append #{i + 1}"
                 )
@@ -94,7 +92,7 @@ def test_log_integrity(identity_id: str, messages: list[tuple[str, str]]):
                         f"Log file is not valid JSON after append #{i + 1}: {exc}"
                     ) from exc
 
-                # --- REQ 3.2: prior entries are not mutated ---
+                # ---   3.2: prior entries are not mutated ---
                 for snap_idx, snapshot in enumerate(snapshots):
                     for entry_idx, prior_entry in enumerate(snapshot):
                         current_entry = current_entries[entry_idx]
@@ -113,13 +111,13 @@ def test_log_integrity(identity_id: str, messages: list[tuple[str, str]]):
                 # Save a deep copy for future mutation checks
                 snapshots.append(copy.deepcopy(current_entries))
 
-                # --- REQ 3.3: entry count equals number of appends so far ---
+                # ---   3.3: entry count equals number of appends so far ---
                 assert len(current_entries) == i + 1, (
                     f"Expected {i + 1} entries after {i + 1} appends, "
                     f"got {len(current_entries)}"
                 )
 
-                # --- REQ 3.3 (order): entries appear in insertion order ---
+                # ---   3.3 (order): entries appear in insertion order ---
                 for j, (exp_role, exp_content) in enumerate(messages[: i + 1]):
                     assert current_entries[j]["role"] == exp_role, (
                         f"Entry {j} role mismatch: expected {exp_role!r}, "
@@ -129,13 +127,13 @@ def test_log_integrity(identity_id: str, messages: list[tuple[str, str]]):
                         f"Entry {j} content mismatch"
                     )
 
-                # --- REQ 3.4: each entry has exactly 3 fields ---
+                # ---   3.4: each entry has exactly 3 fields ---
                 for entry in current_entries:
                     assert set(entry.keys()) == {"timestamp", "role", "content"}, (
                         f"Entry has unexpected fields: {set(entry.keys())}"
                     )
 
-                # --- REQ 3.5: timestamp is ISO 8601 UTC string ending with 'Z' ---
+                # ---   3.5: timestamp is ISO 8601 UTC string ending with 'Z' ---
                 for entry in current_entries:
                     ts = entry["timestamp"]
                     assert isinstance(ts, str), f"timestamp is not a string: {ts!r}"
@@ -150,7 +148,7 @@ def test_log_integrity(identity_id: str, messages: list[tuple[str, str]]):
                             f"timestamp is not valid ISO 8601 UTC: {ts!r}"
                         ) from exc
 
-            # --- Final REQ 3.3 check: load_history returns exactly N entries ---
+            # --- Final   3.3 check: load_history returns exactly N entries ---
             # Uses falcon.identity.load_history with the same patched _LOG_DIR
             final_history = load_history(identity_id)
             assert len(final_history) == len(messages), (

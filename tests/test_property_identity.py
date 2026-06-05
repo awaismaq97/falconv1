@@ -1,19 +1,18 @@
 """
 Property-based tests for Identity Isolation (Property 1).
 
-**Validates: Requirements 1.1, 1.2, 1.3, 1.4, 1.5**
 
 Property 1: Identity Isolation
   For any two distinct identity IDs A and B, no operation on identity A may
   affect the data returned for identity B.
 
   - append_message(A, ...) followed by load_history(B) returns the same
-    result as load_history(B) alone (REQ 1.1).
-  - clear_identity(A) does not alter logs/B.json (REQ 1.2).
+    result as load_history(B) alone (  1.1).
+  - clear_identity(A) does not alter logs/B.json (  1.2).
   - list_identities() returns a set — each identity appears exactly once
-    regardless of how many messages it has (REQ 1.3).
-  - load_history returns [] for a non-existent identity (REQ 1.4).
-  - load_history returns messages in strict chronological/insertion order (REQ 1.5).
+    regardless of how many messages it has (  1.3).
+  - load_history returns [] for a non-existent identity (  1.4).
+  - load_history returns messages in strict chronological/insertion order (  1.5).
 """
 
 import json
@@ -78,9 +77,7 @@ def _restore_log_dirs(original_logger: str, original_identity: str):
 
 
 # ---------------------------------------------------------------------------
-# Property 1a — append_message(A) does not affect load_history(B)
-#
-# Validates: Requirements 1.1
+
 # ---------------------------------------------------------------------------
 
 @given(
@@ -97,7 +94,6 @@ def test_append_to_A_does_not_affect_B(
     """
     Property 1a: append_message(A, ...) does not change load_history(B).
 
-    **Validates: Requirements 1.1**
 
     For distinct identities A and B:
     1. Pre-populate B with some messages (may be empty).
@@ -135,9 +131,7 @@ def test_append_to_A_does_not_affect_B(
 
 
 # ---------------------------------------------------------------------------
-# Property 1b — clear_identity(A) does not alter logs/B.json
-#
-# Validates: Requirements 1.2
+
 # ---------------------------------------------------------------------------
 
 @given(
@@ -154,7 +148,6 @@ def test_clear_A_does_not_affect_B(
     """
     Property 1b: clear_identity(A) does not alter logs/B.json.
 
-    **Validates: Requirements 1.2**
 
     For distinct identities A and B:
     1. Write messages to both A and B.
@@ -208,9 +201,7 @@ def test_clear_A_does_not_affect_B(
 
 
 # ---------------------------------------------------------------------------
-# Property 1c — list_identities() contains each ID exactly once
-#
-# Validates: Requirements 1.3
+
 # ---------------------------------------------------------------------------
 
 @given(
@@ -229,7 +220,6 @@ def test_list_identities_no_duplicates(
     """
     Property 1c: list_identities() contains each identity ID exactly once.
 
-    **Validates: Requirements 1.3**
 
     Even if many messages are written to the same identity, it appears
     exactly once in list_identities().
@@ -273,9 +263,7 @@ def test_list_identities_no_duplicates(
 
 
 # ---------------------------------------------------------------------------
-# Property 1d — load_history returns [] for a non-existent identity
-#
-# Validates: Requirements 1.4
+
 # ---------------------------------------------------------------------------
 
 @given(identity_id=safe_identity_id)
@@ -284,7 +272,6 @@ def test_load_history_empty_for_nonexistent_identity(identity_id: str):
     """
     Property 1d: load_history returns [] when no log file exists.
 
-    **Validates: Requirements 1.4**
 
     For any valid identity ID that has never been written to,
     load_history must return an empty list.
@@ -302,9 +289,7 @@ def test_load_history_empty_for_nonexistent_identity(identity_id: str):
 
 
 # ---------------------------------------------------------------------------
-# Property 1e — load_history returns messages in strict insertion order
-#
-# Validates: Requirements 1.5
+
 # ---------------------------------------------------------------------------
 
 @given(identity_id=safe_identity_id, messages=message_sequence)
@@ -316,7 +301,6 @@ def test_load_history_insertion_order(
     """
     Property 1e: load_history returns messages in strict insertion order.
 
-    **Validates: Requirements 1.5**
 
     After appending N messages in order, load_history must return exactly
     those N messages in the same sequence — no reordering, no gaps.

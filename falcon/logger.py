@@ -22,7 +22,6 @@ _FORBIDDEN_BYTES = {"\x00"}
 def _validate_identity_id(identity_id: str) -> None:
     """Raise ValueError if identity_id contains path-traversal characters.
 
-    Checked characters / sequences per REQ 8.1 and REQ 8.2:
         - forward slash  /
         - backslash      \\
         - double-dot     ..
@@ -54,14 +53,14 @@ def append_message(identity_id: str, role: str, content: str) -> None:
     """Append one message entry to logs/{identity_id}.json.
 
     Behaviour:
-    - Validates identity_id for path-traversal characters (REQ 8.1, 8.2).
-    - Validates role is "user" or "assistant"; raises ValueError otherwise (REQ 3.6).
-    - Auto-creates the logs/ directory if it does not exist (REQ 3.7).
-    - Reads the existing file, or starts with [] if absent (REQ 3.1).
+    - Validates identity_id for path-traversal characters.
+    - Validates role is "user" or "assistant"; raises ValueError otherwise.
+    - Auto-creates the logs/ directory if it does not exist.
+    - Reads the existing file, or starts with [] if absent.
     - Raises json.JSONDecodeError if the existing file is not valid JSON; does
-      not overwrite (REQ 3.8).
-    - Appends an entry with exactly three fields: timestamp, role, content (REQ 3.4, 3.5).
-    - Writes the full updated array back to disk (REQ 3.1, 3.2, 3.3).
+      not overwrite.
+    - Appends an entry with exactly three fields: timestamp, role, content.
+    - Writes the full updated array back to disk.
 
     Args:
         identity_id: Scoping key for the conversation; used as the log filename.

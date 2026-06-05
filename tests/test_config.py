@@ -2,11 +2,11 @@
 Unit tests for falcon/config.py
 
 Requirements covered:
-  - REQ 5.1: Config raises ValueError with actionable message if GROQ_API_KEY
+  -  Config raises ValueError with actionable message if GROQ_API_KEY
              is missing, empty, or whitespace-only.
-  - REQ 5.2: Config exposes default_model (non-empty str), log_dir (non-empty str),
+  -  Config exposes default_model (non-empty str), log_dir (non-empty str),
              default_system_prompt (""), and available_models (list).
-  - REQ 5.3: Config raises ValueError if default_model or log_dir is missing,
+  -  Config raises ValueError if default_model or log_dir is missing,
              empty, or non-string in config.yaml.
 
 Strategy:
@@ -89,12 +89,12 @@ def _reload_config(env_overrides: dict, cfg_dict: dict | None = None):
 
 
 # ---------------------------------------------------------------------------
-# REQ 5.1 — GROQ_API_KEY validation
+# GROQ_API_KEY validation
 # ---------------------------------------------------------------------------
 
 
 class TestGroqApiKeyValidation:
-    """REQ 5.1: ValueError is raised when GROQ_API_KEY is absent or blank."""
+    """ ValueError is raised when GROQ_API_KEY is absent or blank."""
 
     def test_missing_key_raises_value_error(self):
         """GROQ_API_KEY not present in environment → ValueError."""
@@ -119,7 +119,7 @@ class TestGroqApiKeyValidation:
     def test_missing_key_error_message_is_actionable(self):
         """
         The ValueError message must name the missing key and tell the user
-        how to fix it (REQ 5.1: "human-readable message that identifies the
+        how to fix it ("human-readable message that identifies the
         missing key and instructs the user to add it").
         """
         with pytest.raises(ValueError) as exc_info:
@@ -144,12 +144,12 @@ class TestGroqApiKeyValidation:
 
 
 # ---------------------------------------------------------------------------
-# REQ 5.2 — Exposed fields after a successful load
+#  — Exposed fields after a successful load
 # ---------------------------------------------------------------------------
 
 
 class TestValidConfigLoad:
-    """REQ 5.2: Config exposes required fields with correct types and values."""
+    """ 5.2: Config exposes required fields with correct types and values."""
 
     @pytest.fixture(autouse=True)
     def loaded_config(self):
@@ -164,7 +164,7 @@ class TestValidConfigLoad:
         assert self.cfg.GROQ_API_KEY == "sk-unit-test-key"
 
     def test_default_model_is_non_empty_string(self):
-        """default_model must be a non-empty string (REQ 5.2)."""
+        """default_model must be a non-empty string."""
         assert isinstance(self.cfg.default_model, str)
         assert self.cfg.default_model  # truthy → non-empty
 
@@ -173,7 +173,7 @@ class TestValidConfigLoad:
         assert self.cfg.default_model == "test-model"
 
     def test_log_dir_is_non_empty_string(self):
-        """log_dir must be a non-empty string (REQ 5.2)."""
+        """log_dir must be a non-empty string."""
         assert isinstance(self.cfg.log_dir, str)
         assert self.cfg.log_dir  # truthy → non-empty
 
@@ -182,7 +182,7 @@ class TestValidConfigLoad:
         assert self.cfg.log_dir == "logs"
 
     def test_available_models_is_list(self):
-        """available_models must be a list (may be empty) (REQ 5.2)."""
+        """available_models must be a list (may be empty)."""
         assert isinstance(self.cfg.available_models, list)
 
     def test_available_models_contains_expected_entries(self):
@@ -197,7 +197,7 @@ class TestValidConfigLoad:
 
 
 # ---------------------------------------------------------------------------
-# REQ 5.2 — default_system_prompt is always ""
+#  — default_system_prompt is always ""
 # ---------------------------------------------------------------------------
 
 
@@ -232,12 +232,12 @@ class TestDefaultSystemPromptAlwaysSet:
 
 
 # ---------------------------------------------------------------------------
-# REQ 5.3 — config.yaml field validation
+#  — config.yaml field validation
 # ---------------------------------------------------------------------------
 
 
 class TestYamlFieldValidation:
-    """REQ 5.3: ValueError is raised for invalid default_model or log_dir."""
+    """ ValueError is raised for invalid default_model or log_dir."""
 
     # --- default_model ---
 

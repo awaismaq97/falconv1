@@ -33,11 +33,10 @@ def _make_entry(role: str, content: str, timestamp: str = "2025-06-05T14:22:01Z"
 
 
 # ---------------------------------------------------------------------------
-# load_history: non-existent identity returns [] (REQ 1.4)
 # ---------------------------------------------------------------------------
 
 class TestLoadHistoryMissingFile:
-    """REQ 1.4: load_history returns [] when no log file exists."""
+    """ load_history returns [] when no log file exists."""
 
     def test_returns_empty_list_for_unknown_identity(self, isolated_log_dir):
         """Non-existent identity → empty list, no exception."""
@@ -58,11 +57,10 @@ class TestLoadHistoryMissingFile:
 
 
 # ---------------------------------------------------------------------------
-# load_history: corrupted file raises json.JSONDecodeError, file unchanged (REQ 1.6)
 # ---------------------------------------------------------------------------
 
 class TestLoadHistoryCorruptedFile:
-    """REQ 1.6: corrupted log raises json.JSONDecodeError without modifying the file."""
+    """ corrupted log raises json.JSONDecodeError without modifying the file."""
 
     def test_corrupted_file_raises_json_decode_error(self, isolated_log_dir):
         """Plain garbage text → json.JSONDecodeError."""
@@ -105,11 +103,10 @@ class TestLoadHistoryCorruptedFile:
 
 
 # ---------------------------------------------------------------------------
-# load_history: returns entries in chronological order (REQ 1.5)
 # ---------------------------------------------------------------------------
 
 class TestLoadHistoryOrder:
-    """REQ 1.5: load_history returns entries in chronological (insertion) order."""
+    """ load_history returns entries in chronological (insertion) order."""
 
     def test_single_entry_returned_correctly(self, isolated_log_dir):
         """A single-entry log is returned as a one-element list."""
@@ -171,11 +168,10 @@ class TestLoadHistoryReturnsCopy:
 
 
 # ---------------------------------------------------------------------------
-# clear_identity: removes only the target identity file (REQ 1.2)
 # ---------------------------------------------------------------------------
 
 class TestClearIdentity:
-    """REQ 1.2: clear_identity deletes the target file and only the target file."""
+    """ clear_identity deletes the target file and only the target file."""
 
     def test_clear_removes_target_file(self, isolated_log_dir):
         """clear_identity deletes the named identity's log file."""
@@ -188,7 +184,7 @@ class TestClearIdentity:
         assert not log_file.exists()
 
     def test_clear_does_not_remove_other_identity_file(self, isolated_log_dir):
-        """Clearing identity A must not affect identity B's file. REQ 1.1, 1.2."""
+        """Clearing identity A must not affect identity B's file."""
         _write_log(isolated_log_dir, "alpha", [_make_entry("user", "alpha message")])
         _write_log(isolated_log_dir, "beta", [_make_entry("user", "beta message")])
 
@@ -201,7 +197,7 @@ class TestClearIdentity:
         assert beta_file.exists(), "beta must remain untouched"
 
     def test_clear_leaves_other_identity_content_unchanged(self, isolated_log_dir):
-        """After clearing A, B's content is byte-for-byte unchanged. REQ 1.1."""
+        """After clearing A, B's content is byte-for-byte unchanged."""
         entries_b = [
             _make_entry("user", "beta first"),
             _make_entry("assistant", "beta reply"),
@@ -217,7 +213,7 @@ class TestClearIdentity:
         assert beta_file.read_text(encoding="utf-8") == original_content
 
     def test_clear_noop_for_nonexistent_identity(self, isolated_log_dir):
-        """clear_identity on a missing identity must not raise. REQ 1.2 (no-op)."""
+        """clear_identity on a missing identity must not raise. """
         # Should not raise any exception
         clear_identity("does_not_exist")
 
@@ -236,11 +232,10 @@ class TestClearIdentity:
 
 
 # ---------------------------------------------------------------------------
-# list_identities: reflects only existing log files (REQ 1.3, 1.8)
 # ---------------------------------------------------------------------------
 
 class TestListIdentities:
-    """REQ 1.3, 1.8: list_identities returns exactly the IDs with existing log files."""
+    """ list_identities returns exactly the IDs with existing log files."""
 
     def test_empty_logs_dir_returns_empty_list(self, isolated_log_dir):
         """An empty logs/ directory → empty list."""
@@ -268,7 +263,7 @@ class TestListIdentities:
         assert set(result) == {"alice", "bob", "carol"}
 
     def test_each_identity_appears_exactly_once(self, isolated_log_dir):
-        """REQ 1.3: each ID appears exactly once regardless of message count."""
+        """ each ID appears exactly once regardless of message count."""
         _write_log(isolated_log_dir, "multi", [
             _make_entry("user", "first"),
             _make_entry("assistant", "second"),
@@ -278,7 +273,7 @@ class TestListIdentities:
         assert result.count("multi") == 1
 
     def test_cleared_identity_no_longer_listed(self, isolated_log_dir):
-        """After clear_identity, that ID must not appear in list_identities. REQ 1.8."""
+        """After clear_identity, that ID must not appear in list_identities. """
         _write_log(isolated_log_dir, "temp", [_make_entry("user", "msg")])
         assert "temp" in list_identities()
 
@@ -305,11 +300,10 @@ class TestListIdentities:
 
 
 # ---------------------------------------------------------------------------
-# Path-traversal identity_id validation (REQ 8.1, 8.2)
 # ---------------------------------------------------------------------------
 
 class TestPathTraversalValidation:
-    """REQ 8.1, 8.2: forbidden characters in identity_id raise ValueError."""
+    """ forbidden characters in identity_id raise ValueError."""
 
     @pytest.mark.parametrize("bad_id,expected_fragment", [
         ("../etc/passwd", "/"),
@@ -374,7 +368,7 @@ class TestPathTraversalValidation:
 # ---------------------------------------------------------------------------
 
 class TestCrossIdentityIsolation:
-    """REQ 1.1: operations on identity A must not affect identity B."""
+    """ operations on identity A must not affect identity B."""
 
     def test_load_history_b_unaffected_after_writing_to_a(self, isolated_log_dir):
         """

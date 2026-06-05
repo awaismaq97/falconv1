@@ -2,12 +2,10 @@
 Integration tests for Falcon V1.
 
 Task 8.4: Property test for Context Continuity (Property 6)
-  Validates: Requirements 1.9, 1.10, 1.11
 
 Task 8.5: Full send-flow integration tests
   Tests that Logger → Identity → Engine (mocked Groq) → Logger
   produces the correct log state and raw_payload shape.
-  Validates: Requirements 1.1, 1.9, 1.10, 1.11, 6.1, 6.2
 """
 
 import os
@@ -51,8 +49,7 @@ def _make_mock_llm(response_text: str = "mocked response"):
 
 
 # ---------------------------------------------------------------------------
-# Property 6: Context Continuity (task 8.4)
-# Validates: Requirements 1.9, 1.10, 1.11
+# Property 6: Context Continuity
 # ---------------------------------------------------------------------------
 
 safe_identity_id = st.from_regex(r"[a-zA-Z][a-zA-Z0-9_]{0,19}", fullmatch=True)
@@ -71,7 +68,6 @@ def test_context_continuity_after_restart(
     """
     Property 6: Context Continuity
 
-    **Validates: Requirements 1.9, 1.10, 1.11**
 
     Write N messages to a temp log via Logger.append_message; simulate an app
     restart by calling load_history; assert returned history has exactly N
@@ -89,12 +85,12 @@ def test_context_continuity_after_restart(
             # Simulate app restart: fresh load_history call
             loaded = load_history(identity_id)
 
-            # REQ 1.10: exact count preserved
+            # exact count preserved
             assert len(loaded) == len(messages), (
                 f"After restart: expected {len(messages)} entries, got {len(loaded)}"
             )
 
-            # REQ 1.9, 1.11: no reordering, no truncation
+            # no reordering, no truncation
             for idx, (exp_role, exp_content) in enumerate(messages):
                 assert loaded[idx]["role"] == exp_role, (
                     f"Entry {idx} role mismatch after restart"
@@ -108,7 +104,6 @@ def test_context_continuity_after_restart(
 
 # ---------------------------------------------------------------------------
 # Task 8.5: Integration tests for full send flow
-# Validates: Requirements 1.1, 1.9, 1.10, 1.11, 6.1, 6.2
 # ---------------------------------------------------------------------------
 
 class TestFullSendFlow:
@@ -120,7 +115,7 @@ class TestFullSendFlow:
     @patch("falcon.engine.ChatGroq")
     def test_send_flow_produces_correct_log_state(self, mock_chatgroq_cls, tmp_path, monkeypatch):
         """
-        REQ 6.1, 6.2: After a full send flow, the log contains the user message
+        After a full send flow, the log contains the user message
         followed by the assistant message.
         """
         monkeypatch.setattr(logger_module, "_LOG_DIR", str(tmp_path))
@@ -154,7 +149,6 @@ class TestFullSendFlow:
     @patch("falcon.engine.ChatGroq")
     def test_raw_payload_shape_in_send_flow(self, mock_chatgroq_cls, tmp_path, monkeypatch):
         """
-        REQ 2.1–2.5: raw_payload from run_inference has the correct shape:
         system entry (if prompt non-empty) + all prior messages.
         """
         monkeypatch.setattr(logger_module, "_LOG_DIR", str(tmp_path))
@@ -176,7 +170,6 @@ class TestFullSendFlow:
     @patch("falcon.engine.ChatGroq")
     def test_context_continuity_10_messages(self, mock_chatgroq_cls, tmp_path, monkeypatch):
         """
-        REQ 1.9, 1.11: With 10 prior messages and an empty system prompt,
         engine receives all 10 prior messages plus the new user message = 11 entries.
         """
         monkeypatch.setattr(logger_module, "_LOG_DIR", str(tmp_path))
@@ -209,7 +202,7 @@ class TestFullSendFlow:
     @patch("falcon.engine.ChatGroq")
     def test_identity_isolation_in_send_flow(self, mock_chatgroq_cls, tmp_path, monkeypatch):
         """
-        REQ 1.1: Messages written for identity A do not appear in identity B's history.
+         Messages written for identity A do not appear in identity B's history.
         """
         monkeypatch.setattr(logger_module, "_LOG_DIR", str(tmp_path))
         monkeypatch.setattr(identity_module, "_LOG_DIR", str(tmp_path))
@@ -238,7 +231,7 @@ class TestFullSendFlow:
     @patch("falcon.engine.ChatGroq")
     def test_app_restart_continuity(self, mock_chatgroq_cls, tmp_path, monkeypatch):
         """
-        REQ 1.10: After writing messages in a 'first session', loading history in a
+         After writing messages in a 'first session', loading history in a
         'second session' returns identical entries — zero loss.
         """
         monkeypatch.setattr(logger_module, "_LOG_DIR", str(tmp_path))
@@ -268,7 +261,7 @@ class TestFullSendFlow:
     @patch("falcon.engine.ChatGroq")
     def test_failed_inference_does_not_log_assistant_entry(self, mock_chatgroq_cls, tmp_path, monkeypatch):
         """
-        REQ 6.5: If run_inference raises an exception, no assistant entry is logged.
+         If run_inference raises an exception, no assistant entry is logged.
         (Mirrors what app.py must do — only log on success.)
         """
         monkeypatch.setattr(logger_module, "_LOG_DIR", str(tmp_path))

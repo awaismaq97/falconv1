@@ -12,24 +12,23 @@ from falcon.engine import build_payload, run_inference
 # ---------------------------------------------------------------------------
 
 class TestBuildPayload:
-    """Tests for build_payload(system_prompt, messages) — REQ 2.1–2.5, 4.1–4.3."""
 
     # --- with non-empty system prompt ---
 
     def test_non_empty_prompt_is_prepended(self):
-        """REQ 2.1: non-empty system_prompt → first entry is {"role": "system", ...}."""
+        """ non-empty system_prompt → first entry is {"role": "system", ...}."""
         payload = build_payload("You are a pirate.", [])
         assert len(payload) == 1
         assert payload[0] == {"role": "system", "content": "You are a pirate."}
 
     def test_system_prompt_content_unmodified(self):
-        """REQ 2.1, 4.2: system_prompt content is passed through without modification."""
+        """ system_prompt content is passed through without modification."""
         prompt = "  extra spaces and\nnewlines  "
         payload = build_payload(prompt, [])
         assert payload[0]["content"] == prompt
 
     def test_messages_follow_system_entry(self):
-        """REQ 2.3: user/assistant messages follow the system entry in order."""
+        """ user/assistant messages follow the system entry in order."""
         messages = [
             {"role": "user", "content": "Hello"},
             {"role": "assistant", "content": "Hi there"},
@@ -43,7 +42,7 @@ class TestBuildPayload:
         assert payload[3] == {"role": "user", "content": "How are you?"}
 
     def test_payload_length_with_system_prompt(self):
-        """REQ 2.4: len(payload) == len(messages) + 1 when system_prompt non-empty."""
+        """ len(payload) == len(messages) + 1 when system_prompt non-empty."""
         messages = [{"role": "user", "content": "msg"}] * 5
         payload = build_payload("prompt", messages)
         assert len(payload) == 6
@@ -51,32 +50,32 @@ class TestBuildPayload:
     # --- with empty or whitespace-only system prompt ---
 
     def test_empty_prompt_no_system_entry(self):
-        """REQ 2.2, 2.5: empty string → no system entry."""
+        """ empty string → no system entry."""
         messages = [{"role": "user", "content": "hi"}]
         payload = build_payload("", messages)
         assert len(payload) == 1
         assert payload[0] == {"role": "user", "content": "hi"}
 
     def test_whitespace_only_prompt_no_system_entry(self):
-        """REQ 4.1: whitespace-only prompt → no system entry."""
+        """ whitespace-only prompt → no system entry."""
         messages = [{"role": "user", "content": "hi"}]
         payload = build_payload("   \t\n  ", messages)
         assert all(e["role"] != "system" for e in payload)
         assert len(payload) == 1
 
     def test_empty_prompt_empty_messages_returns_empty_list(self):
-        """REQ 2.4: empty prompt + empty messages → empty payload."""
+        """empty prompt + empty messages → empty payload."""
         payload = build_payload("", [])
         assert payload == []
 
     def test_non_empty_prompt_empty_messages_returns_one_entry(self):
-        """REQ 2.4: non-empty prompt + empty messages → payload length 1."""
+        """ non-empty prompt + empty messages → payload length 1."""
         payload = build_payload("system only", [])
         assert len(payload) == 1
         assert payload[0]["role"] == "system"
 
     def test_payload_length_without_system_prompt(self):
-        """REQ 2.4: len(payload) == len(messages) when system_prompt is empty."""
+        """ len(payload) == len(messages) when system_prompt is empty."""
         messages = [{"role": "user", "content": f"msg {i}"} for i in range(7)]
         payload = build_payload("", messages)
         assert len(payload) == 7
@@ -84,7 +83,7 @@ class TestBuildPayload:
     # --- message content preservation ---
 
     def test_message_content_is_not_modified(self):
-        """REQ 4.3: message content values are passed through with no modification."""
+        """ message content values are passed through with no modification."""
         messages = [
             {"role": "user", "content": "  leading and trailing spaces  "},
             {"role": "assistant", "content": "line1\nline2\nline3"},
@@ -107,7 +106,6 @@ class TestBuildPayload:
 # ---------------------------------------------------------------------------
 
 class TestRunInference:
-    """Tests for run_inference() with mocked ChatGroq — REQ 2.1–2.5, 4.1–4.3."""
 
     def _make_mock_llm(self, response_text: str = "mocked response"):
         """Return a mock ChatGroq instance whose invoke() returns an AIMessage-like object."""
@@ -149,7 +147,7 @@ class TestRunInference:
 
     @patch("falcon.engine.ChatGroq")
     def test_no_system_entry_in_payload_for_empty_prompt(self, mock_chatgroq_cls):
-        """REQ 4.1: no system entry in raw_payload when system_prompt is empty."""
+        """ no system entry in raw_payload when system_prompt is empty."""
         mock_chatgroq_cls.return_value = self._make_mock_llm()
         messages = [{"role": "user", "content": "test"}]
 
@@ -159,7 +157,7 @@ class TestRunInference:
 
     @patch("falcon.engine.ChatGroq")
     def test_system_entry_present_for_non_empty_prompt(self, mock_chatgroq_cls):
-        """REQ 2.1: system entry is first in raw_payload when system_prompt is non-empty."""
+        """ system entry is first in raw_payload when system_prompt is non-empty."""
         mock_chatgroq_cls.return_value = self._make_mock_llm()
         messages = [{"role": "user", "content": "hello"}]
         system_prompt = "Custom system instruction."

@@ -2,11 +2,11 @@
 Unit tests for falcon/logger.py.
 
 Covers:
-- Two-message round-trip (REQ 3.1, 3.2, 3.3, 3.4, 3.5)
-- role validation raises ValueError and does not write (REQ 3.6)
-- Corrupted log raises json.JSONDecodeError and leaves file unchanged (REQ 3.8)
-- logs/ directory auto-creation (REQ 3.7)
-- Path-traversal identity_id raises ValueError (REQ 8.1, 8.2)
+- Two-message round-trip (  3.1, 3.2, 3.3, 3.4, 3.5)
+- role validation raises ValueError and does not write (  3.6)
+- Corrupted log raises json.JSONDecodeError and leaves file unchanged (  3.8)
+- logs/ directory auto-creation (  3.7)
+- Path-traversal identity_id raises ValueError (  8.1, 8.2)
 """
 
 import json
@@ -43,13 +43,13 @@ def isolated_log_dir(tmp_path, monkeypatch):
 
 
 # ---------------------------------------------------------------------------
-# Test: logs/ directory auto-creation (REQ 3.7)
+# Test: logs/ directory auto-creation (  3.7)
 # ---------------------------------------------------------------------------
 
 def test_logs_directory_autocreated(tmp_path, monkeypatch):
     """
     When the logs/ directory does not yet exist, append_message must create it.
-    REQ 3.7: auto-create logs/ directory if absent.
+      3.7: auto-create logs/ directory if absent.
     """
     import os
     new_dir = tmp_path / "new_logs_dir"
@@ -65,14 +65,14 @@ def test_logs_directory_autocreated(tmp_path, monkeypatch):
 
 
 # ---------------------------------------------------------------------------
-# Test: two-message round-trip (REQ 3.1, 3.2, 3.3, 3.4, 3.5)
+# Test: two-message round-trip (  3.1, 3.2, 3.3, 3.4, 3.5)
 # ---------------------------------------------------------------------------
 
 def test_two_message_round_trip(isolated_log_dir):
     """
     Append two messages and verify count, field presence, field values, and
     that the file is valid JSON after each write.
-    REQ 3.1–3.5.
+      3.1–3.5.
     """
     log_file = isolated_log_dir / "conv.json"
 
@@ -84,14 +84,14 @@ def test_two_message_round_trip(isolated_log_dir):
     append_message("conv", "assistant", "second message")
     entries = json.loads(log_file.read_text(encoding="utf-8"))
 
-    # REQ 3.3: exactly N entries for N appends
+    #   3.3: exactly N entries for N appends
     assert len(entries) == 2
 
-    # REQ 3.4: each entry has exactly three fields
+    #   3.4: each entry has exactly three fields
     for entry in entries:
         assert set(entry.keys()) == {"timestamp", "role", "content"}
 
-    # REQ 3.5: timestamp is ISO 8601 UTC
+    #   3.5: timestamp is ISO 8601 UTC
     for entry in entries:
         assert ISO_8601_UTC.match(entry["timestamp"]), (
             f"timestamp {entry['timestamp']!r} does not match ISO 8601 UTC pattern"
@@ -108,7 +108,7 @@ def test_prior_entries_not_mutated(isolated_log_dir):
     """
     After a second append, the first entry's timestamp, role, and content must
     be unchanged.
-    REQ 3.2: prior entries are not mutated.
+      3.2: prior entries are not mutated.
     """
     log_file = isolated_log_dir / "immut.json"
 
@@ -119,19 +119,19 @@ def test_prior_entries_not_mutated(isolated_log_dir):
     append_message("immut", "assistant", "reply")
     entries_after_second = json.loads(log_file.read_text(encoding="utf-8"))
 
-    # REQ 3.2
+    #   3.2
     assert entries_after_second[0] == first_snapshot
 
 
 # ---------------------------------------------------------------------------
-# Test: role validation (REQ 3.6)
+# Test: role validation (  3.6)
 # ---------------------------------------------------------------------------
 
 @pytest.mark.parametrize("bad_role", ["system", "User", "ASSISTANT", "", "admin", "human"])
 def test_invalid_role_raises_value_error(isolated_log_dir, bad_role):
     """
     An invalid role must raise ValueError before any I/O.
-    REQ 3.6: invalid role → ValueError, no write.
+      3.6: invalid role → ValueError, no write.
     """
     log_file = isolated_log_dir / "role_test.json"
     assert not log_file.exists()
@@ -146,7 +146,7 @@ def test_invalid_role_raises_value_error(isolated_log_dir, bad_role):
 def test_invalid_role_does_not_overwrite_existing_log(isolated_log_dir):
     """
     If the log file already exists, an invalid role must not modify it.
-    REQ 3.6: no write on ValueError.
+      3.6: no write on ValueError.
     """
     append_message("existing", "user", "prior entry")
     log_file = isolated_log_dir / "existing.json"
@@ -159,14 +159,14 @@ def test_invalid_role_does_not_overwrite_existing_log(isolated_log_dir):
 
 
 # ---------------------------------------------------------------------------
-# Test: corrupted log raises json.JSONDecodeError and leaves file unchanged (REQ 3.8)
+# Test: corrupted log raises json.JSONDecodeError and leaves file unchanged (  3.8)
 # ---------------------------------------------------------------------------
 
 def test_corrupted_log_raises_json_decode_error(isolated_log_dir):
     """
     If the log file exists but contains invalid JSON, append_message must raise
     json.JSONDecodeError without overwriting the file.
-    REQ 3.8.
+      3.8.
     """
     log_file = isolated_log_dir / "bad.json"
     corrupted_content = "this is not json at all {{{"
@@ -182,7 +182,7 @@ def test_corrupted_log_raises_json_decode_error(isolated_log_dir):
 def test_partially_corrupted_log_leaves_file_unchanged(isolated_log_dir):
     """
     A file that starts like JSON but is truncated must also leave the file alone.
-    REQ 3.8.
+      3.8.
     """
     log_file = isolated_log_dir / "partial.json"
     partial_content = '[{"timestamp": "2025-01-01T00:00:00Z", "role": "user"'
@@ -195,7 +195,7 @@ def test_partially_corrupted_log_leaves_file_unchanged(isolated_log_dir):
 
 
 # ---------------------------------------------------------------------------
-# Test: path-traversal identity_id validation (REQ 8.1, 8.2)
+# Test: path-traversal identity_id validation (  8.1, 8.2)
 # ---------------------------------------------------------------------------
 
 @pytest.mark.parametrize("bad_id,expected_fragment", [
@@ -210,7 +210,7 @@ def test_path_traversal_identity_id_raises_value_error(isolated_log_dir, bad_id,
     """
     identity_id values containing /, \\, .., or null bytes must raise ValueError
     before any file path is constructed.
-    REQ 8.1, 8.2.
+      8.1, 8.2.
     """
     with pytest.raises(ValueError) as exc_info:
         append_message(bad_id, "user", "content")
@@ -221,7 +221,7 @@ def test_path_traversal_identity_id_raises_value_error(isolated_log_dir, bad_id,
 
 
 # ---------------------------------------------------------------------------
-# Test: valid roles are accepted (sanity / REQ 3.6 positive case)
+# Test: valid roles are accepted (sanity /   3.6 positive case)
 # ---------------------------------------------------------------------------
 
 @pytest.mark.parametrize("valid_role", ["user", "assistant"])

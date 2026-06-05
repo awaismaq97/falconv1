@@ -429,6 +429,9 @@ def _render_chat_tab(user_input: str | None) -> None:
     else:
         # ── Render existing history ───────────────────────────────────────────
         for entry in history:
+            # Skip assistant entries with no visible content
+            if entry.get("role") == "assistant" and not entry.get("content", "").strip():
+                continue
             with st.chat_message(entry.get("role", "user")):
                 st.markdown(entry.get("content", ""))
 

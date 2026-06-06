@@ -25,12 +25,12 @@ def build_payload(system_prompt: str, messages: list[dict]) -> list[dict]:
 
     Behaviour:
     - If `system_prompt` is non-empty and not whitespace-only, prepends one entry
-      with role="system" and content=system_prompt, with no modification (REQ 2.1).
+      with role="system" and content=system_prompt, with no modification.
     - If `system_prompt` is empty or whitespace-only, no system entry is included
-      in the returned list (REQ 2.2, REQ 2.5, REQ 4.1).
+      in the returned list.
     - All entries from `messages` are included in their original order with their
-      content values unchanged (REQ 2.3, REQ 4.3).
-    - Total length equals len(messages) + (1 if system_prompt.strip() else 0) (REQ 2.4).
+      content values unchanged.
+    - Total length equals len(messages) + (1 if system_prompt.strip() else 0).
 
     Args:
         system_prompt: The system prompt string. May be empty.
@@ -42,10 +42,8 @@ def build_payload(system_prompt: str, messages: list[dict]) -> list[dict]:
     payload: list[dict] = []
 
     if system_prompt and system_prompt.strip():
-        # REQ 2.1, REQ 4.2 — include system entry only when non-empty / non-whitespace
         payload.append({"role": "system", "content": system_prompt})
 
-    # REQ 2.3, REQ 4.3 — copy messages verbatim; do not normalise content
     for message in messages:
         payload.append({"role": message["role"], "content": message["content"]})
 

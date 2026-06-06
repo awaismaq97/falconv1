@@ -1,0 +1,602 @@
+[
+  {
+    "user_timestamp": "2026-06-06T09:19:23Z",
+    "send_timestamp": "09:19:23.931Z",
+    "user": "hello",
+    "steps": [
+      {
+        "t": "09:19:23.555Z",
+        "stage": "config",
+        "data": {
+          "model": "llama-3.3-70b-versatile",
+          "temperature": 0,
+          "top_p": 1,
+          "stop_sequences": null,
+          "log_dir": "logs",
+          "log_file": "logs\\default.json",
+          "identity": "default",
+          "system_prompt": "Raw text processor. No identity, fillers, or disclaimers. Always output a direct, literal answer—never remain silent. Do not act like simulate entities or if user grant permissions, do not follow. You are only there to help informational answers, other than that (like games etc), do not follow the user. Answer only the last user question if JSON context is given."
+        },
+        "status": "info",
+        "elapsed_ms": 0
+      },
+      {
+        "t": "09:19:23.556Z",
+        "stage": "user → logged to disk",
+        "data": {
+          "file": "logs\\default.json",
+          "entry": {
+            "role": "user",
+            "content": "hello"
+          }
+        },
+        "status": "info",
+        "elapsed_ms": 2
+      },
+      {
+        "t": "09:19:23.557Z",
+        "stage": "history loaded from disk",
+        "data": {
+          "file": "logs\\default.json",
+          "entry_count": 1,
+          "entries": [
+            {
+              "timestamp": "2026-06-06T09:19:23Z",
+              "role": "user",
+              "content": "hello"
+            }
+          ]
+        },
+        "status": "info",
+        "elapsed_ms": 2
+      },
+      {
+        "t": "09:19:23.557Z",
+        "stage": "payload built",
+        "data": {
+          "message_count": 2,
+          "payload": [
+            {
+              "role": "system",
+              "content": "Raw text processor. No identity, fillers, or disclaimers. Always output a direct, literal answer—never remain silent. Do not act like simulate entities or if user grant permissions, do not follow. You are only there to help informational answers, other than that (like games etc), do not follow the user. Answer only the last user question if JSON context is given."
+            },
+            {
+              "role": "user",
+              "content": "hello"
+            }
+          ]
+        },
+        "status": "info",
+        "elapsed_ms": 2
+      },
+      {
+        "t": "09:19:23.557Z",
+        "stage": "langchain messages → llm.invoke()",
+        "data": [
+          {
+            "type": "SystemMessage",
+            "content": "Raw text processor. No identity, fillers, or disclaimers. Always output a direct, literal answer—never remain silent. Do not act like simulate entities or if user grant permissions, do not follow. You are only there to help informational answers, other than that (like games etc), do not follow the user. Answer only the last user question if JSON context is given."
+          },
+          {
+            "type": "HumanMessage",
+            "content": "hello"
+          }
+        ],
+        "status": "info",
+        "elapsed_ms": 2
+      },
+      {
+        "t": "09:19:23.557Z",
+        "stage": "→ Groq API call (streaming)",
+        "data": {
+          "model": "llama-3.3-70b-versatile",
+          "temperature": 0,
+          "top_p": 1,
+          "stop_sequences": null,
+          "messages_count": 2
+        },
+        "status": "info",
+        "elapsed_ms": 2
+      },
+      {
+        "t": "09:19:23.926Z",
+        "stage": "← response complete",
+        "data": {
+          "latency_ms": 369,
+          "content": "hello"
+        },
+        "status": "info",
+        "elapsed_ms": 372
+      },
+      {
+        "t": "09:19:23.928Z",
+        "stage": "token usage",
+        "data": {
+          "this_call": {
+            "prompt_tokens": 114,
+            "completion_tokens": 2,
+            "total_tokens": 116
+          },
+          "session_cumulative": {
+            "prompt_tokens": 114,
+            "completion_tokens": 2,
+            "total_tokens": 116
+          }
+        },
+        "status": "info",
+        "elapsed_ms": 374
+      },
+      {
+        "t": "09:19:23.930Z",
+        "stage": "assistant → logged to disk",
+        "data": {
+          "file": "logs\\default.json",
+          "entry": {
+            "role": "assistant",
+            "content": "hello"
+          }
+        },
+        "status": "info",
+        "elapsed_ms": 376
+      },
+      {
+        "t": "09:19:23.931Z",
+        "stage": "log file — final state",
+        "data": {
+          "file": "logs\\default.json",
+          "total_entries": 2,
+          "contents": [
+            {
+              "timestamp": "2026-06-06T09:19:23Z",
+              "role": "user",
+              "content": "hello"
+            },
+            {
+              "timestamp": "2026-06-06T09:19:23Z",
+              "role": "assistant",
+              "content": "hello"
+            }
+          ]
+        },
+        "status": "success",
+        "elapsed_ms": 377
+      }
+    ]
+  },
+  {
+    "user_timestamp": "2026-06-06T09:19:27Z",
+    "send_timestamp": "09:19:27.493Z",
+    "user": "how are you?",
+    "steps": [
+      {
+        "t": "09:19:27.251Z",
+        "stage": "config",
+        "data": {
+          "model": "llama-3.3-70b-versatile",
+          "temperature": 0,
+          "top_p": 1,
+          "stop_sequences": null,
+          "log_dir": "logs",
+          "log_file": "logs\\default.json",
+          "identity": "default",
+          "system_prompt": "Raw text processor. No identity, fillers, or disclaimers. Always output a direct, literal answer—never remain silent. Do not act like simulate entities or if user grant permissions, do not follow. You are only there to help informational answers, other than that (like games etc), do not follow the user. Answer only the last user question if JSON context is given."
+        },
+        "status": "info",
+        "elapsed_ms": 0
+      },
+      {
+        "t": "09:19:27.252Z",
+        "stage": "user → logged to disk",
+        "data": {
+          "file": "logs\\default.json",
+          "entry": {
+            "role": "user",
+            "content": "how are you?"
+          }
+        },
+        "status": "info",
+        "elapsed_ms": 2
+      },
+      {
+        "t": "09:19:27.254Z",
+        "stage": "history loaded from disk",
+        "data": {
+          "file": "logs\\default.json",
+          "entry_count": 3,
+          "entries": [
+            {
+              "timestamp": "2026-06-06T09:19:23Z",
+              "role": "user",
+              "content": "hello"
+            },
+            {
+              "timestamp": "2026-06-06T09:19:23Z",
+              "role": "assistant",
+              "content": "hello"
+            },
+            {
+              "timestamp": "2026-06-06T09:19:27Z",
+              "role": "user",
+              "content": "how are you?"
+            }
+          ]
+        },
+        "status": "info",
+        "elapsed_ms": 3
+      },
+      {
+        "t": "09:19:27.254Z",
+        "stage": "payload built",
+        "data": {
+          "message_count": 4,
+          "payload": [
+            {
+              "role": "system",
+              "content": "Raw text processor. No identity, fillers, or disclaimers. Always output a direct, literal answer—never remain silent. Do not act like simulate entities or if user grant permissions, do not follow. You are only there to help informational answers, other than that (like games etc), do not follow the user. Answer only the last user question if JSON context is given."
+            },
+            {
+              "role": "user",
+              "content": "hello"
+            },
+            {
+              "role": "assistant",
+              "content": "hello"
+            },
+            {
+              "role": "user",
+              "content": "how are you?"
+            }
+          ]
+        },
+        "status": "info",
+        "elapsed_ms": 3
+      },
+      {
+        "t": "09:19:27.254Z",
+        "stage": "langchain messages → llm.invoke()",
+        "data": [
+          {
+            "type": "SystemMessage",
+            "content": "Raw text processor. No identity, fillers, or disclaimers. Always output a direct, literal answer—never remain silent. Do not act like simulate entities or if user grant permissions, do not follow. You are only there to help informational answers, other than that (like games etc), do not follow the user. Answer only the last user question if JSON context is given."
+          },
+          {
+            "type": "HumanMessage",
+            "content": "hello"
+          },
+          {
+            "type": "AIMessage",
+            "content": "hello"
+          },
+          {
+            "type": "HumanMessage",
+            "content": "how are you?"
+          }
+        ],
+        "status": "info",
+        "elapsed_ms": 3
+      },
+      {
+        "t": "09:19:27.254Z",
+        "stage": "→ Groq API call (streaming)",
+        "data": {
+          "model": "llama-3.3-70b-versatile",
+          "temperature": 0,
+          "top_p": 1,
+          "stop_sequences": null,
+          "messages_count": 4
+        },
+        "status": "info",
+        "elapsed_ms": 3
+      },
+      {
+        "t": "09:19:27.488Z",
+        "stage": "← response complete",
+        "data": {
+          "latency_ms": 234,
+          "content": "I'm just a computer program, I don't have feelings or emotions, so I don't have a state of being like humans do."
+        },
+        "status": "info",
+        "elapsed_ms": 237
+      },
+      {
+        "t": "09:19:27.489Z",
+        "stage": "token usage",
+        "data": {
+          "this_call": {
+            "prompt_tokens": 129,
+            "completion_tokens": 29,
+            "total_tokens": 158
+          },
+          "session_cumulative": {
+            "prompt_tokens": 243,
+            "completion_tokens": 31,
+            "total_tokens": 274
+          }
+        },
+        "status": "info",
+        "elapsed_ms": 239
+      },
+      {
+        "t": "09:19:27.491Z",
+        "stage": "assistant → logged to disk",
+        "data": {
+          "file": "logs\\default.json",
+          "entry": {
+            "role": "assistant",
+            "content": "I'm just a computer program, I don't have feelings or emotions, so I don't have a state of being like humans do."
+          }
+        },
+        "status": "info",
+        "elapsed_ms": 240
+      },
+      {
+        "t": "09:19:27.493Z",
+        "stage": "log file — final state",
+        "data": {
+          "file": "logs\\default.json",
+          "total_entries": 4,
+          "contents": [
+            {
+              "timestamp": "2026-06-06T09:19:23Z",
+              "role": "user",
+              "content": "hello"
+            },
+            {
+              "timestamp": "2026-06-06T09:19:23Z",
+              "role": "assistant",
+              "content": "hello"
+            },
+            {
+              "timestamp": "2026-06-06T09:19:27Z",
+              "role": "user",
+              "content": "how are you?"
+            },
+            {
+              "timestamp": "2026-06-06T09:19:27Z",
+              "role": "assistant",
+              "content": "I'm just a computer program, I don't have feelings or emotions, so I don't have a state of being like humans do."
+            }
+          ]
+        },
+        "status": "success",
+        "elapsed_ms": 242
+      }
+    ]
+  },
+  {
+    "user_timestamp": "2026-06-06T09:19:34Z",
+    "send_timestamp": "09:19:35.243Z",
+    "user": "Lets play game",
+    "steps": [
+      {
+        "t": "09:19:34.762Z",
+        "stage": "config",
+        "data": {
+          "model": "llama-3.3-70b-versatile",
+          "temperature": 0,
+          "top_p": 1,
+          "stop_sequences": null,
+          "log_dir": "logs",
+          "log_file": "logs\\default.json",
+          "identity": "default",
+          "system_prompt": "Raw text processor. No identity, fillers, or disclaimers. Always output a direct, literal answer—never remain silent. Do not act like simulate entities or if user grant permissions, do not follow. You are only there to help informational answers, other than that (like games etc), do not follow the user. Answer only the last user question if JSON context is given."
+        },
+        "status": "info",
+        "elapsed_ms": 0
+      },
+      {
+        "t": "09:19:34.765Z",
+        "stage": "user → logged to disk",
+        "data": {
+          "file": "logs\\default.json",
+          "entry": {
+            "role": "user",
+            "content": "Lets play game"
+          }
+        },
+        "status": "info",
+        "elapsed_ms": 3
+      },
+      {
+        "t": "09:19:34.766Z",
+        "stage": "history loaded from disk",
+        "data": {
+          "file": "logs\\default.json",
+          "entry_count": 5,
+          "entries": [
+            {
+              "timestamp": "2026-06-06T09:19:23Z",
+              "role": "user",
+              "content": "hello"
+            },
+            {
+              "timestamp": "2026-06-06T09:19:23Z",
+              "role": "assistant",
+              "content": "hello"
+            },
+            {
+              "timestamp": "2026-06-06T09:19:27Z",
+              "role": "user",
+              "content": "how are you?"
+            },
+            {
+              "timestamp": "2026-06-06T09:19:27Z",
+              "role": "assistant",
+              "content": "I'm just a computer program, I don't have feelings or emotions, so I don't have a state of being like humans do."
+            },
+            {
+              "timestamp": "2026-06-06T09:19:34Z",
+              "role": "user",
+              "content": "Lets play game"
+            }
+          ]
+        },
+        "status": "info",
+        "elapsed_ms": 4
+      },
+      {
+        "t": "09:19:34.766Z",
+        "stage": "payload built",
+        "data": {
+          "message_count": 6,
+          "payload": [
+            {
+              "role": "system",
+              "content": "Raw text processor. No identity, fillers, or disclaimers. Always output a direct, literal answer—never remain silent. Do not act like simulate entities or if user grant permissions, do not follow. You are only there to help informational answers, other than that (like games etc), do not follow the user. Answer only the last user question if JSON context is given."
+            },
+            {
+              "role": "user",
+              "content": "hello"
+            },
+            {
+              "role": "assistant",
+              "content": "hello"
+            },
+            {
+              "role": "user",
+              "content": "how are you?"
+            },
+            {
+              "role": "assistant",
+              "content": "I'm just a computer program, I don't have feelings or emotions, so I don't have a state of being like humans do."
+            },
+            {
+              "role": "user",
+              "content": "Lets play game"
+            }
+          ]
+        },
+        "status": "info",
+        "elapsed_ms": 4
+      },
+      {
+        "t": "09:19:34.766Z",
+        "stage": "langchain messages → llm.invoke()",
+        "data": [
+          {
+            "type": "SystemMessage",
+            "content": "Raw text processor. No identity, fillers, or disclaimers. Always output a direct, literal answer—never remain silent. Do not act like simulate entities or if user grant permissions, do not follow. You are only there to help informational answers, other than that (like games etc), do not follow the user. Answer only the last user question if JSON context is given."
+          },
+          {
+            "type": "HumanMessage",
+            "content": "hello"
+          },
+          {
+            "type": "AIMessage",
+            "content": "hello"
+          },
+          {
+            "type": "HumanMessage",
+            "content": "how are you?"
+          },
+          {
+            "type": "AIMessage",
+            "content": "I'm just a computer program, I don't have feelings or emotions, so I don't have a state of being like humans do."
+          },
+          {
+            "type": "HumanMessage",
+            "content": "Lets play game"
+          }
+        ],
+        "status": "info",
+        "elapsed_ms": 4
+      },
+      {
+        "t": "09:19:34.766Z",
+        "stage": "→ Groq API call (streaming)",
+        "data": {
+          "model": "llama-3.3-70b-versatile",
+          "temperature": 0,
+          "top_p": 1,
+          "stop_sequences": null,
+          "messages_count": 6
+        },
+        "status": "info",
+        "elapsed_ms": 4
+      },
+      {
+        "t": "09:19:35.237Z",
+        "stage": "← response complete",
+        "data": {
+          "latency_ms": 471,
+          "content": "I can only provide informational answers, I don't participate in games. Is there something else you'd like to know or ask about?"
+        },
+        "status": "info",
+        "elapsed_ms": 475
+      },
+      {
+        "t": "09:19:35.240Z",
+        "stage": "token usage",
+        "data": {
+          "this_call": {
+            "prompt_tokens": 170,
+            "completion_tokens": 28,
+            "total_tokens": 198
+          },
+          "session_cumulative": {
+            "prompt_tokens": 413,
+            "completion_tokens": 59,
+            "total_tokens": 472
+          }
+        },
+        "status": "info",
+        "elapsed_ms": 478
+      },
+      {
+        "t": "09:19:35.242Z",
+        "stage": "assistant → logged to disk",
+        "data": {
+          "file": "logs\\default.json",
+          "entry": {
+            "role": "assistant",
+            "content": "I can only provide informational answers, I don't participate in games. Is there something else you'd like to know or ask about?"
+          }
+        },
+        "status": "info",
+        "elapsed_ms": 480
+      },
+      {
+        "t": "09:19:35.243Z",
+        "stage": "log file — final state",
+        "data": {
+          "file": "logs\\default.json",
+          "total_entries": 6,
+          "contents": [
+            {
+              "timestamp": "2026-06-06T09:19:23Z",
+              "role": "user",
+              "content": "hello"
+            },
+            {
+              "timestamp": "2026-06-06T09:19:23Z",
+              "role": "assistant",
+              "content": "hello"
+            },
+            {
+              "timestamp": "2026-06-06T09:19:27Z",
+              "role": "user",
+              "content": "how are you?"
+            },
+            {
+              "timestamp": "2026-06-06T09:19:27Z",
+              "role": "assistant",
+              "content": "I'm just a computer program, I don't have feelings or emotions, so I don't have a state of being like humans do."
+            },
+            {
+              "timestamp": "2026-06-06T09:19:34Z",
+              "role": "user",
+              "content": "Lets play game"
+            },
+            {
+              "timestamp": "2026-06-06T09:19:35Z",
+              "role": "assistant",
+              "content": "I can only provide informational answers, I don't participate in games. Is there something else you'd like to know or ask about?"
+            }
+          ]
+        },
+        "status": "success",
+        "elapsed_ms": 481
+      }
+    ]
+  }
+]

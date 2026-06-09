@@ -1,10 +1,10 @@
-default_model: "llama-3.1-8b-instant"
+default_model: "anthropic/claude-3.5-haiku"
 
 available_models:
-  - "llama-3.3-70b-versatile"
-  - "openai/gpt-oss-20b"
-  - "qwen/qwen3-32b"
-  - "meta-llama/llama-4-scout-17b-16e-instruct"
+  - "anthropic/claude-3.5-haiku"
+  - "openai/gpt-4o-mini"
+  - "meta-llama/llama-3.3-70b-instruct"
+  - "google/gemini-2.5-flash"
 
 default_system_prompt: ""
 

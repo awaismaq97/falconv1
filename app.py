@@ -299,7 +299,7 @@ def _handle_send(user_input: str) -> None:
         elif e["role"] == "assistant": lc_preview.append(AIMessage(content=e["content"]))
     _push("langchain messages → llm.invoke()", _lc_message_repr(lc_preview))
 
-    _push("→ Groq API call (streaming)", {"model": model, "temperature": 0, "top_p": 1,
+    _push("→ OpenRouter API call (streaming)", {"model": model, "temperature": 0, "top_p": 1,
                                            "stop_sequences": None, "messages_count": len(raw_payload)})
 
     # Stream tokens into a chat bubble in real time
@@ -309,13 +309,13 @@ def _handle_send(user_input: str) -> None:
         model_name=model,
         system_prompt=system_prompt,
         messages=messages,
-        groq_api_key=Config.GROQ_API_KEY,
+        api_key=Config.OPENROUTER_API_KEY,
     )
     try:
         with st.chat_message("assistant"):
             response_text = st.write_stream(stream_gen)
     except Exception as exc:
-        _push("ERROR — Groq API", str(exc), status="error")
+        _push("ERROR — OpenRouter API", str(exc), status="error")
         st.error(f"Inference failed: {exc}")
         st.session_state.history = Identity.load_history(identity_id)
         st.session_state.trace_log = trace

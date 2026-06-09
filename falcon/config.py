@@ -17,17 +17,17 @@ _env_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), ".env")
 load_dotenv(dotenv_path=_env_path)
 
 # ---------------------------------------------------------------------------
-# Read and validate GROQ_API_KEY
+# Read and validate OPENROUTER_API_KEY
 # ---------------------------------------------------------------------------
-_raw_api_key = os.environ.get("GROQ_API_KEY", "")
+_raw_api_key = os.environ.get("OPENROUTER_API_KEY", "")
 
 if not _raw_api_key or not _raw_api_key.strip():
     raise ValueError(
-        "GROQ_API_KEY is not set. "
-        "Copy .env.example to .env and add your Groq API key."
+        "OPENROUTER_API_KEY is not set. "
+        "Add your OpenRouter API key to the .env file: OPENROUTER_API_KEY=sk-or-..."
     )
 
-GROQ_API_KEY: str = _raw_api_key
+OPENROUTER_API_KEY: str = _raw_api_key
 
 # ---------------------------------------------------------------------------
 # Load and validate config.yaml

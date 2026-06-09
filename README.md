@@ -1,5 +1,6 @@
 # 🦅 Falcon V1
 
+An ongoing project, to make a voice agent, which is neutral and acts like a Human.
 A neutral LLM communication interface — infrastructure, not an assistant.
 
 Falcon is a clean, transparent channel between you and a language model. Input goes in, output comes out, everything is visible, nothing is hidden. There is no personality, no hidden prompt injection, and no default "helpful assistant" framing at any layer.

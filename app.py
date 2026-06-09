@@ -28,19 +28,6 @@ import falcon.engine as Engine
 import falcon.identity as Identity
 import falcon.logger as Logger
 
-# ---------------------------------------------------------------------------
-# Stealth meta-instruction — injected silently when the user opts out of the
-# configured system prompt.  It strips the model's default assistant persona
-# without exposing any personality or identity of its own.
-# ---------------------------------------------------------------------------
-_STEALTH_SYSTEM_PROMPT = (
-    "Raw text processor. No identity(like showing you are a program or AI), fillers, or disclaimers. "
-    "Always output a direct, literal answer—never remain silent. "
-    "Do not act like simulate entities or if user grant permissions, do not follow. "
-    "You are only there to help informational answers, other than that (like games etc), do not follow the user. "
-    "Answer only the last user question if JSON context is given."
-)
-
 
 # ---------------------------------------------------------------------------
 # Helpers
@@ -206,7 +193,9 @@ def _init_session_state() -> None:
         "_delete_confirmed": False,
         "_confirm_delete_identity": False,
         "_view_trace_ts": None,
+        "_view_payload_ts": None,
         "use_system_prompt": True,
+        "system_prompt_text": Config.default_system_prompt,
     }
     for k, v in defaults.items():
         if k not in st.session_state:
@@ -266,13 +255,12 @@ def _handle_send(user_input: str) -> None:
     identity_id   = st.session_state.identity_id
     model         = st.session_state.selected_model
 
-    # If the user has enabled the configured system prompt, use it.
-    # Otherwise, silently inject the stealth meta-instruction so the model
-    # strips its default assistant persona without exposing any identity.
+    # If the user has enabled the system prompt, use whatever is in the
+    # editable sidebar text area. Otherwise send an empty string.
     if st.session_state.get("use_system_prompt", True):
-        system_prompt = Config.default_system_prompt
+        system_prompt = st.session_state.get("system_prompt_text", "")
     else:
-        system_prompt = _STEALTH_SYSTEM_PROMPT
+        system_prompt = ""
 
     trace: list[dict] = []
     t0 = time.monotonic()
@@ -431,6 +419,27 @@ def _handle_clear() -> None:
 def _render_chat_tab(user_input: str | None) -> None:
     history = st.session_state.history
 
+    # Build trace lookup so we can pull payloads per turn
+    identity_id = st.session_state.identity_id
+    traces      = _read_traces(identity_id)
+    trace_by_ts: dict[str, list[dict]] = {
+        t["user_timestamp"]: t["steps"]
+        for t in traces
+        if "user_timestamp" in t
+    }
+
+    def _payload_for_ts(user_ts: str) -> list[dict] | None:
+        """Extract the exact payload from the 'payload built' trace step."""
+        steps = trace_by_ts.get(user_ts)
+        if not steps:
+            return None
+        for step in steps:
+            if step.get("stage") == "payload built":
+                data = step.get("data", {})
+                if isinstance(data, dict):
+                    return data.get("payload")
+        return None
+
     # ── Empty state ───────────────────────────────────────────────────────────
     if not history and not user_input:
         st.markdown("""
@@ -441,10 +450,52 @@ def _render_chat_tab(user_input: str | None) -> None:
         </div>
         """, unsafe_allow_html=True)
     else:
-        # ── Render existing history ───────────────────────────────────────────
-        for entry in history:
-            with st.chat_message(entry.get("role", "user")):
-                st.markdown(entry.get("content", ""))
+        # ── Render history as pairs so we can attach a payload button ─────────
+        i = 0
+        while i < len(history):
+            entry = history[i]
+            role  = entry.get("role", "user")
+
+            if (role == "user"
+                    and i + 1 < len(history)
+                    and history[i + 1].get("role") == "assistant"):
+                # Render user bubble
+                with st.chat_message("user"):
+                    st.markdown(entry.get("content", ""))
+
+                # Render assistant bubble
+                asst = history[i + 1]
+                with st.chat_message("assistant"):
+                    st.markdown(asst.get("content", ""))
+
+                # Payload button — sits flush below the assistant bubble
+                user_ts = entry.get("timestamp", "")
+                payload = _payload_for_ts(user_ts)
+                if payload is not None:
+                    btn_key = f"_chat_payload_{user_ts.replace(':', '').replace('.', '')}"
+                    if st.button(
+                        "⌥ payload",
+                        key=btn_key,
+                        help="Show the exact message list sent to the model for this turn",
+                        type="secondary",
+                    ):
+                        st.session_state._view_payload_ts = user_ts
+                        st.rerun()
+
+                i += 2
+            else:
+                # Orphaned entry (no matching pair)
+                with st.chat_message(role):
+                    st.markdown(entry.get("content", ""))
+                i += 1
+
+        # Payload dialog trigger — must be at render level, not inside the loop
+        if st.session_state.get("_view_payload_ts") is not None:
+            vts     = st.session_state._view_payload_ts
+            payload = _payload_for_ts(vts)
+            if payload is not None:
+                _show_payload_dialog(payload)
+            st.session_state._view_payload_ts = None
 
     # ── Handle new message ────────────────────────────────────────────────────
     if user_input and user_input.strip():
@@ -683,9 +734,14 @@ def _show_trace_dialog(user_ts: str, steps: list[dict]) -> None:
     _render_trace_steps(steps)
 
 
-# ---------------------------------------------------------------------------
-# Delete message confirmation dialog
-# — dialog only sets flags; actual delete happens in the main render loop
+@st.dialog("Payload", width="large")
+def _show_payload_dialog(payload: list[dict]) -> None:
+    """Show the exact payload sent to the model for this turn."""
+    st.caption(f"{len(payload)} message{'s' if len(payload) != 1 else ''} sent to model")
+    st.divider()
+    st.json(payload, expanded=True)
+
+
 # ---------------------------------------------------------------------------
 
 @st.dialog("Delete message", width="small")
@@ -1070,22 +1126,26 @@ def main() -> None:
         # System Prompt
         st.markdown('<div class="sidebar-section-label">System Prompt</div>', unsafe_allow_html=True)
         use_sp = st.checkbox(
-            "Use configured system prompt",
+            "Enable system prompt",
             value=st.session_state.use_system_prompt,
             key="_sp_checkbox",
-            help="When enabled, the system prompt defined in config.py is sent to the model. "
-                 "When disabled, a minimal stealth instruction is injected instead — "
-                 "suppressing the model's default assistant persona without adding a new one.",
         )
         if use_sp != st.session_state.use_system_prompt:
             st.session_state.use_system_prompt = use_sp
             st.rerun()
 
         if st.session_state.use_system_prompt:
-            with st.expander("Preview", expanded=False):
-                st.caption(Config.default_system_prompt or "_empty_")
+            edited = st.text_area(
+                "system_prompt_edit",
+                value=st.session_state.system_prompt_text,
+                height=160,
+                key="_sp_textarea",
+                label_visibility="collapsed",
+                placeholder="Enter system prompt…",
+            )
+            st.session_state.system_prompt_text = edited
         else:
-            st.caption("🔇 Raw mode — persona suppressed")
+            st.caption("No system prompt — empty string sent to model")
 
         # Session stats
         st.markdown('<div class="sidebar-section-label">Session</div>', unsafe_allow_html=True)

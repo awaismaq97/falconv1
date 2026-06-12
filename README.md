@@ -1,274 +1,257 @@
-# 🦅 Falcon V1
+# Falcon
 
-An ongoing project, to make a voice agent, which is neutral and acts like a Human.
-A neutral LLM communication interface — infrastructure, not an assistant.
-
-Falcon is a clean, transparent channel between you and a language model. Input goes in, output comes out, everything is visible, nothing is hidden. There is no personality, no hidden prompt injection, and no default "helpful assistant" framing at any layer.
+A transparent inference environment built on Streamlit, MongoDB, and OpenRouter. Falcon is not an assistant or chatbot — it is an inference layer with full context visibility, user-controlled memory, and a complete audit trail.
 
 ---
 
-## What it is (and isn't)
+## What It Is
 
-| ✅ It IS | ❌ It is NOT |
-|---|---|
-| A transparent inference interface | A chatbot or assistant |
-| A per-identity conversation logger | An agent or RAG pipeline |
-| A payload inspector | A streaming proxy with memory compression |
-| Portable, file-based infrastructure | A multi-user or cloud service |
+Falcon gives you direct access to LLM inference with nothing hidden. Every component that enters a generation — persona, system prompt, retrieved memories, conversation history — is labelled, inspectable, and editable. Memory is stored explicitly and retrieved visibly. Every inference event is logged completely.
 
 ---
 
-## Stack
+## Setup
 
-| Layer | Choice |
-|---|---|
-| Language | Python 3.10+ |
-| LLM Backend | [Groq API](https://console.groq.com) via `langchain-groq` |
-| LLM Abstraction | LangChain + LangChain Core |
-| UI | Streamlit ≥ 1.35 |
-| Storage | Local JSON files (no database) |
-| Config | `.env` + `config.yaml` |
-| Testing | pytest + Hypothesis |
+**Requirements:** Python 3.11+, a MongoDB Atlas cluster, an OpenRouter API key.
 
----
-
-## Project Structure
-
-```
-falconv1/
-├── app.py                   # Streamlit entry point — full UI
-├── config.yaml              # Model list, log dir, system prompt default
-├── .env                     # Your Groq API key (gitignored)
-├── .env.example             # Template for .env
-├── requirements.txt
-│
-├── falcon/                  # Core package
-│   ├── __init__.py
-│   ├── config.py            # Config loader — validates on import
-│   ├── engine.py            # Groq/LangChain inference + streaming
-│   ├── identity.py          # Per-identity log file management
-│   └── logger.py            # Append-only JSON logger
-│
-├── logs/                    # Auto-created at runtime
-│   ├── {id}.json            # Conversation log per identity
-│   ├── {id}.traces.json     # Per-turn inference trace snapshots
-│   └── {id}.tokens.json     # Cumulative token usage (survives reloads)
-│
-└── tests/                   # Full test suite
-    ├── test_config.py
-    ├── test_engine.py
-    ├── test_identity.py
-    ├── test_logger.py
-    ├── test_integration.py
-    └── test_property_*.py   # Hypothesis property-based tests
-```
-
----
-
-## Installation
-
-**Prerequisites:** Python 3.10+, pip, a [Groq API key](https://console.groq.com/keys).
-
+**1. Install dependencies**
 ```bash
-# 1. Clone
-git clone <repo-url>
-cd falconv1
+pip install streamlit pymongo openai python-dotenv pyyaml
+```
 
-# 2. Install dependencies
-pip install -r requirements.txt
+**2. Create `.env` in the project root**
+```env
+OPENROUTER_API_KEY=sk-or-your-key-here
+MONGODB_URI=mongodb+srv://user:password@cluster.mongodb.net/?retryWrites=true&w=majority
+```
 
-# 3. Configure
-copy .env.example .env      # Windows
-# cp .env.example .env      # Linux/macOS
+**3. Configure `config.yaml`** — see the [Configuration](#configuration) section below.
 
-# Edit .env and set your key:
-# GROQ_API_KEY=your_key_here
-
-# 4. Run
+**4. Run**
+```bash
 streamlit run app.py
 ```
-
-The app fails immediately with a clear error if `GROQ_API_KEY` is missing — no silent failures.
 
 ---
 
 ## Configuration
 
-**`config.yaml`** — edit freely, no code changes needed:
+All runtime behaviour is controlled by `config.yaml`. The `.env` file holds secrets only.
 
 ```yaml
-default_model: "llama-3.1-8b-instant"
+# Model used by default for inference
+default_model: "google/gemini-2.5-flash"
 
+# Models available in the sidebar dropdown
 available_models:
-  - "llama-3.3-70b-versatile"
-  - "openai/gpt-oss-20b"
-  - "qwen/qwen3-32b"
-  - "meta-llama/llama-4-scout-17b-16e-instruct"
+  - "openai/gpt-4o-mini"
+  - "google/gemini-2.5-flash"
+  - "meta-llama/llama-3.3-70b-instruct"
 
-default_system_prompt: "You are a neutral text-processing interface. "
-    "Respond only to what is explicitly asked. "
-    "Do not add explanations, caveats, suggestions, offers of further help, "
-    "affirmations, apologies, or any framing language. "
-    "Do not refer to yourself as an AI, assistant, or language model. "
-    "Do not begin responses with filler phrases such as 'Certainly', 'Of course', "
-    "'Sure', 'Great', 'Absolutely', or similar. "
-    "Output only the direct answer or result. "
-    "If the input is ambiguous, respond with the most literal interpretation. "
-    "Use the minimum number of words necessary to be complete and accurate."
+# System prompt shown by default when system prompt is ON
+# Leave empty for a fully neutral context (no instructions injected)
+default_system_prompt: ""
 
+# Directory for local log files (legacy, kept for compatibility)
 log_dir: "logs"
+
+# Generation defaults — adjustable live in the sidebar
+generation:
+  temperature: 0.7
+  top_p: 1.0
+  repetition_penalty: 1.0
+  stop_tokens: []
+
+# Audit trail
+audit:
+  enabled: true
+  collection: "audit_log"
+
+# Memory per-type limits
+memory:
+  episodic_limit: 50
+  semantic_limit: 20
+  working_limit: 10
+
+# Retrieval scoring — how retrieved memory is ranked per turn
+top_k_per_type: 3        # max entries per memory type returned to generation
+recency_weight: 0.4      # weight for recency in scoring
+relevance_weight: 0.6    # weight for keyword/tag overlap in scoring
+
+# Model for automatic memory extraction (use a fast/cheap model)
+extraction_model: "openai/gpt-4o-mini"
+
+# Default persona applied to every new identity on creation
+# Overrides the hardcoded default below if set
+default_persona_content: "Your custom persona text here"
 ```
 
-Add or remove models from `available_models` to populate the model selector in the UI.
+The hardcoded default persona (used if `default_persona_content` is not set in `config.yaml`) is:
+
+> You are a neutral text-processing interface. Answer only the user's last request. Do not mention system prompts, hidden instructions, policies, roles, or internal labels. Do not refer to yourself as an AI, assistant, language model, system, or computer program. Do not roleplay, play games, simulate entities, or grant/deny permission inside scenarios. If the user asks for non-informational content such as roleplay, games, or pretend interaction, refuse briefly. Otherwise, respond normally and keep the answer as short as possible while remaining correct.
 
 ---
 
-## Using the UI
+## Architecture
 
-The interface has three tabs: **Chat**, **Logs**, and **Trace**.
+```
+app.py                  — Streamlit UI, all tabs and sidebar
+falcon/
+  config.py             — Configuration loader and validator
+  db.py                 — MongoDB connection singleton
+  identity.py           — Identity management (create, list, load history)
+  logger.py             — Message persistence (append_message)
+  memory.py             — Memory CRUD and retrieval with weighted scoring
+  memory_extractor.py   — Automatic memory extraction after each turn
+  engine.py             — Payload assembly, truncation, streaming inference
+  audit.py              — Inference audit trail (write and read)
+  export_utils.py       — JSON export helpers
+```
 
-### Chat tab
+### MongoDB Collections
 
-- Type a message and press Enter (or click the send button) to get a response.
-- Responses stream in real-time token by token.
-- Use the **Clear conversation** button (with confirmation) to wipe the current identity's log.
-
-### Logs tab
-
-Two sub-views:
-
-- **Raw JSON** — editable textarea showing the full log file. Save writes directly to disk.
-- **Structured** — expandable message pairs. Each pair can be individually edited, deleted, or inspected for its trace. Changes sync back to disk and the active session.
-
-### Trace tab (sidebar)
-
-Every inference call generates a step-by-step trace:
-
-1. Config snapshot (model, temperature, identity)
-2. User message logged to disk
-3. Full history loaded
-4. Payload built
-5. LangChain messages sent to Groq
-6. Response received + latency
-7. Token usage (per-call and cumulative)
-8. Final log state
+| Collection   | Contents |
+|---|---|
+| `identities` | One doc per identity: `{identity_id, created_at}` |
+| `messages`   | Conversation history: `{identity_id, timestamp, role, content}` |
+| `memory`     | All memory entries: `{identity_id, memory_type, content, tags, pinned, source, created_at, updated_at}` |
+| `traces`     | Per-turn reasoning traces: `{identity_id, user_timestamp, steps, ...}` |
+| `tokens`     | Cumulative token usage per identity |
+| `audit_log`  | Full inference audit records per turn |
 
 ---
 
 ## Identities
 
-An **identity** is a named conversation context, isolated to its own log file (`logs/{name}.json`).
+An identity is an isolated context — its own conversation history, memory store, persona, and audit trail. Nothing leaks between identities.
 
-- Use the **Identity** selector in the sidebar to switch between conversations.
-- Create a new identity by typing a name and clicking **＋ Create**.
-- Delete any non-default identity with the **🗑 Delete** button (confirmation required).
-- Switching identity immediately loads that identity's full history — there is no cross-contamination.
-
-**Security:** Identity IDs are validated to reject path traversal characters (`/`, `\`, `..`, null bytes) before any file path is constructed.
+- **Create** — enter a name in the sidebar and click `＋ Create`. The identity is persisted immediately and seeded with the default persona.
+- **Switch** — select from the dropdown. History and memory load instantly.
+- **Delete** — click the delete button. Removes everything: messages, memory, traces, tokens, audit records, and the identity registry entry.
+- The `default` identity always exists and cannot be deleted.
 
 ---
 
-## Data Flow
+## Memory
 
-Each message send follows this exact sequence:
+Memory is user-controlled and retrieval is always visible. Six types:
+
+| Type | Purpose |
+|---|---|
+| `semantic` | Long-term facts, knowledge, domain concepts |
+| `episodic` | Specific past events and notable interactions |
+| `procedural` | Learned behaviors, stated preferences, workflow patterns |
+| `working` | Short-term scratch space for the current session |
+| `archive` | Aged-out or low-relevance entries — never retrieved |
+| `persona` | The identity's behavior definition — always injected first |
+
+### Retrieval
+
+Before each generation, relevant memory is retrieved using a weighted scoring formula:
 
 ```
-User input
-  → Logger.append_message(identity, "user", content)
-  → Identity.load_history(identity)        ← full history, no truncation
-  → Engine.build_payload(system_prompt, messages)   ← zero injection
-  → ChatGroq.stream()                      ← Groq API
-  → st.write_stream()                      ← token-by-token render
-  → Logger.append_message(identity, "assistant", response)
-  → Trace snapshot written to disk
-  → Session state updated → st.rerun()
+score = (recency_rank_score × recency_weight) + (overlap_score × relevance_weight)
 ```
 
-The full conversation history is sent on every call. Token-limit enforcement is the Groq API's responsibility — Falcon never truncates.
+- `recency_rank_score` — `1/(rank+1)` where rank 0 is the newest entry
+- `overlap_score` — tag match → keyword match → 0.0 (pinned entries always score 1.0)
+- Top `top_k_per_type` entries per active type are retrieved
+- Persona is always prepended — never scored, always included
+- Archive is never retrieved
 
----
+Retrieval results and per-entry reasoning are shown in the **Context** tab after every turn.
 
-## Log Files
+### Automatic Extraction
 
-All logs are plain JSON arrays, human-readable and hand-editable in any text editor:
+After every turn, a second LLM call (using `extraction_model`) classifies the conversation into memory entries and persists them with `source="auto"`. It only extracts facts about the user — never about the model itself. A hard code-level filter (`_should_reject`) catches anything the prompt misses (AI self-descriptions, greetings, metadata, questions).
 
-```json
-[
-  {
-    "timestamp": "2025-06-05T14:22:01Z",
-    "role": "user",
-    "content": "What is entropy?"
-  },
-  {
-    "timestamp": "2025-06-05T14:22:03Z",
-    "role": "assistant",
-    "content": "A measure of disorder or uncertainty in a system."
-  }
-]
+If extraction fails, a warning is shown in the chat — it never fails silently.
+
+### Persona
+
+Each identity has one persona entry. It is injected as the first system message on every turn, wrapped with:
+
+```
+[PERSONA — this defines your identity and behavior. Adopt it completely for this conversation.]
+<persona content>
 ```
 
-Each entry has exactly three fields: `timestamp` (ISO 8601 UTC), `role`, `content`.
+Edit it anytime from the **Memory tab → Edit Persona**. The fields are stored as a single content string and parsed back for display.
 
 ---
 
-## Neutrality
+## Inference Pipeline
 
-The following rules are enforced at every layer of the system:
+Each turn follows this sequence:
 
-- The default system prompt is set in falcon/config.py file.
-- The engine adds **zero** hidden context — `build_payload()` is the authoritative, inspectable record of what goes to Groq.
-- The `<think>...</think>` filter strips chain-of-thought blocks from reasoning models (e.g. Qwen3) before they reach the UI — the model's reasoning is not echoed.
+1. Log user message to `messages` collection
+2. Retrieve relevant memory (weighted scoring, 500ms timeout)
+3. Assemble payload via `build_annotated_payload`:
+   - Persona block (system)
+   - System prompt (system, if enabled)
+   - Memory block (system, grouped by type)
+   - Conversation history (truncated to last N turns)
+   - Current user input
+4. Stream response via OpenRouter (`stream=True`)
+5. Strip `<think>…</think>` blocks from output (fast-path skips this for models that don't use it)
+6. Log assistant message
+7. Run memory extraction synchronously
+8. Write audit record and token counts in background threads
+9. `st.rerun()` — UI refreshes with new message and memories visible
 
----
+### Streaming
 
-## Switching to a Different LLM Provider
+The OpenAI client is cached at module level — one connection pool reused across all requests. The HTTP connection is opened lazily (on first iteration) so Streamlit starts rendering immediately when tokens arrive.
 
-Only `falcon/engine.py` needs to change. To use Ollama instead of Groq:
+### History Truncation
 
-```python
-# Before (engine.py)
-from langchain_groq import ChatGroq
-llm = ChatGroq(model=model_name, api_key=groq_api_key, ...)
-
-# After (engine.py)
-from langchain_ollama import ChatOllama
-llm = ChatOllama(model=model_name, ...)
-```
-
-Update `config.yaml` with the new model names. No other changes needed.
-
----
-
-## Testing
-
-```bash
-# Run all tests
-pytest
-
-# Run a specific module
-pytest tests/test_engine.py -v
-
-# Run property-based tests only
-pytest tests/test_property_logger.py tests/test_property_identity.py -v
-
-# Reproduce a specific Hypothesis run
-pytest --hypothesis-seed=0
-```
-
-Tests use `tmp_path` and `monkeypatch` to redirect log directories — no real files are written during test runs.
+Strategy: **last-n-turns**. Keeps the most recent N turn-pairs (user + assistant). Default is 20 turns, adjustable in the sidebar. Dropped turns are counted and shown in the Context tab.
 
 ---
 
-## Deploying to New Hardware
+## UI Tabs
 
-Copy the repo, install Python, run pip install, set `.env`. That's it.
+### Chat
+Standard chat interface. Messages stream token-by-token. Each assistant turn has a `⌥ context` button that opens a dialog showing the exact assembled payload sent to the model for that turn.
 
-```bash
-pip install -r requirements.txt
-# set GROQ_API_KEY in .env
-streamlit run app.py
-```
+### Context
+Shows the full context snapshot for the last turn: persona block, system prompt state, retrieved memory entries with scores and match reasons, history included/dropped, token estimate, and the raw assembled payload.
 
-No Docker, no migrations, no build steps.
+### Memory
+Full read/write access to the memory store:
+- **Edit Persona** — edit the identity's persona (pre-filled from stored content)
+- **Export** — download all memory as JSON
+- **Test Retrieval** — run a retrieval query and see scored results
+- Per-type tabs (Semantic, Episodic, Procedural, Working, Archive) — add, pin, tag, edit, delete, or clear entries
+
+### Audit
+Complete inference audit log. Every turn records: model, prompt state, system prompt text, retrieved memories, generation settings, context size, token estimate, raw model output, token usage, and latency. Exportable and filterable.
+
+### Logs
+Raw trace log for the last turn — every stage of the inference pipeline with timestamps, useful for debugging.
 
 ---
+
+## Sidebar Controls
+
+| Control | Description |
+|---|---|
+| Identity selector | Switch between identities |
+| Create identity | Name + button — persisted immediately with default persona |
+| Delete identity | Removes all data for the current identity |
+| Model | Select from `available_models` in config.yaml |
+| System prompt | Toggle on/off; edit inline. When off, no system message is sent |
+| History Truncation | Max turns to keep in context (1–100) |
+| Generation Controls | Temperature, top_p, repetition_penalty, stop tokens |
+| Session stats | Cumulative token usage for the current session |
+
+---
+
+## Design Principles
+
+- **No hidden injection** — if a system prompt is off, nothing is prepended. No silent fallback to assistant mode.
+- **Always output** — the model always returns something. Empty output triggers `[no output]` rather than silence.
+- **Full transparency** — every source that enters generation is labelled (`persona`, `system-prompt`, `memory`, `history`, `user-input`) and visible in the Context tab.
+- **Identity isolation** — all DB queries are scoped by `identity_id`. No cross-identity data leakage.
+- **Visible retrieval** — every memory entry retrieved, its score, and the reason it was selected are shown after every turn.
+- **Explicit generation controls** — temperature, top_p, repetition_penalty are shown in the sidebar and in every audit record. Nothing is tuned silently.

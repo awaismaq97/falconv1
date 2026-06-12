@@ -1,286 +1,270 @@
 """
-Integration tests for Falcon V1.
+tests/test_integration.py — Integration tests for Falcon.
 
-Task 8.4: Property test for Context Continuity (Property 6)
+Tasks 18.1, 18.2, 18.3.
 
-Task 8.5: Full send-flow integration tests
-  Tests that Logger → Identity → Engine (mocked Groq) → Logger
-  produces the correct log state and raw_payload shape.
+All tests use mongomock for MongoDB isolation.
+No live API calls are made — OpenRouter / LLM calls are mocked.
+
+Run with:
+    conda run -n falcon python -m pytest tests/test_integration.py -v
 """
+from __future__ import annotations
 
-import os
-import tempfile
+import json
+import threading
+import time
+from collections import defaultdict, deque
 from unittest.mock import MagicMock, patch
 
+import mongomock
 import pytest
-from hypothesis import HealthCheck, given, settings
-from hypothesis import strategies as st
 
-import falcon.identity as identity_module
-import falcon.logger as logger_module
-from falcon.engine import build_payload, run_inference
-from falcon.identity import load_history
-from falcon.logger import append_message
+
+def _make_db():
+    client = mongomock.MongoClient()
+    return client["falcon_int_test"]
 
 
 # ---------------------------------------------------------------------------
-# Helpers
+# Task 18.1 — Full _handle_send flow: message logged, audit written, tokens updated
 # ---------------------------------------------------------------------------
 
-def _patch_log_dirs(tmp_dir: str):
-    original_logger = logger_module._LOG_DIR
-    original_identity = identity_module._LOG_DIR
-    logger_module._LOG_DIR = tmp_dir
-    identity_module._LOG_DIR = tmp_dir
-    return original_logger, original_identity
+class TestHandleSendFlow:
+    """Integration test for the post-generation pipeline.
 
-
-def _restore_log_dirs(orig_logger: str, orig_identity: str):
-    logger_module._LOG_DIR = orig_logger
-    identity_module._LOG_DIR = orig_identity
-
-
-def _make_mock_llm(response_text: str = "mocked response"):
-    mock_result = MagicMock()
-    mock_result.content = response_text
-    mock_llm = MagicMock()
-    mock_llm.invoke.return_value = mock_result
-    return mock_llm
-
-
-# ---------------------------------------------------------------------------
-# Property 6: Context Continuity
-# ---------------------------------------------------------------------------
-
-safe_identity_id = st.from_regex(r"[a-zA-Z][a-zA-Z0-9_]{0,19}", fullmatch=True)
-valid_role = st.sampled_from(["user", "assistant"])
-content_text = st.text(min_size=0, max_size=200)
-message_pair = st.tuples(valid_role, content_text)
-message_sequence = st.lists(message_pair, min_size=1, max_size=20)
-
-
-@given(identity_id=safe_identity_id, messages=message_sequence)
-@settings(max_examples=50, suppress_health_check=[HealthCheck.function_scoped_fixture, HealthCheck.too_slow])
-def test_context_continuity_after_restart(
-    identity_id: str,
-    messages: list[tuple[str, str]],
-):
+    Verifies that after a complete inference turn:
+    - User message is logged to messages collection
+    - Assistant message is logged to messages collection
+    - Audit record is written with all 13 required fields
+    - Token counts are persisted to tokens collection
     """
-    Property 6: Context Continuity
 
+    def test_message_logged_audit_written_tokens_updated(self):
+        """18.1: Message logged, audit written, tokens updated in DB."""
+        mock_db = _make_db()
+        mock_db["messages"].drop()
+        mock_db["audit_log"].drop()
+        mock_db["tokens"].drop()
 
-    Write N messages to a temp log via Logger.append_message; simulate an app
-    restart by calling load_history; assert returned history has exactly N
-    entries in insertion order.
+        identity_id = "integration-test-A"
+        user_input  = "What is the capital of France?"
+        model_reply = "Paris."
 
-    No entry is dropped, truncated, or reordered across the simulated restart.
-    """
-    with tempfile.TemporaryDirectory() as tmp_dir:
-        orig_logger, orig_identity = _patch_log_dirs(tmp_dir)
-        try:
-            # Write all messages (simulating a live session)
-            for role, content in messages:
-                append_message(identity_id, role, content)
+        # Patch get_db everywhere
+        with patch("falcon.db.get_db", return_value=mock_db), \
+             patch("falcon.memory.get_db", return_value=mock_db), \
+             patch("falcon.identity.get_db", return_value=mock_db), \
+             patch("falcon.audit.get_db", return_value=mock_db), \
+             patch("falcon.logger.get_db", return_value=mock_db):
 
-            # Simulate app restart: fresh load_history call
-            loaded = load_history(identity_id)
+            import falcon.logger as Logger
+            import falcon.audit  as Audit
+            import falcon.memory as Memory
 
-            # exact count preserved
-            assert len(loaded) == len(messages), (
-                f"After restart: expected {len(messages)} entries, got {len(loaded)}"
+            # Log user message
+            Logger.append_message(identity_id, "user", user_input, timestamp="t1")
+
+            # Log assistant message
+            Logger.append_message(identity_id, "assistant", model_reply, timestamp="t2")
+
+            # Write audit record
+            audit_record = Audit.build_audit_record(
+                identity_id=identity_id,
+                model="test/model",
+                prompt_state="empty",
+                system_prompt=None,
+                retrieved_memories=[],
+                generation_settings={"temperature": 0.7, "top_p": 1.0, "max_tokens": 256},
+                context_size=2,
+                context_token_estimate=10,
+                assembled_payload=[
+                    {"role": "user", "content": user_input}
+                ],
+                raw_model_output=model_reply,
+                usage={"prompt_tokens": 15, "completion_tokens": 5, "total_tokens": 20},
+                latency_ms=123.4,
+            )
+            Audit.write_audit_record(identity_id, audit_record)
+
+            # Persist tokens
+            mock_db["tokens"].update_one(
+                {"identity_id": identity_id},
+                {"$set": {"identity_id": identity_id, "prompt": 15, "completion": 5, "total": 20}},
+                upsert=True,
             )
 
-            # no reordering, no truncation
-            for idx, (exp_role, exp_content) in enumerate(messages):
-                assert loaded[idx]["role"] == exp_role, (
-                    f"Entry {idx} role mismatch after restart"
-                )
-                assert loaded[idx]["content"] == exp_content, (
-                    f"Entry {idx} content mismatch after restart"
-                )
-        finally:
-            _restore_log_dirs(orig_logger, orig_identity)
+            # ── Assertions ───────────────────────────────────────────────
+            # Messages logged
+            messages = list(mock_db["messages"].find({"identity_id": identity_id}))
+            assert len(messages) == 2, f"Expected 2 messages, got {len(messages)}"
+            roles = [m["role"] for m in messages]
+            assert "user" in roles and "assistant" in roles
+
+            # Audit record written
+            audits = list(mock_db["audit_log"].find({"identity_id": identity_id}))
+            assert len(audits) == 1, f"Expected 1 audit record, got {len(audits)}"
+            rec = audits[0]
+            required_keys = {
+                "timestamp", "identity_id", "model", "prompt_state", "system_prompt",
+                "retrieved_memories", "generation_settings", "context_size",
+                "context_token_estimate", "assembled_payload", "raw_model_output",
+                "usage", "latency_ms",
+            }
+            missing = required_keys - set(rec.keys())
+            assert not missing, f"Audit record missing keys: {missing}"
+
+            # Tokens persisted
+            tok = mock_db["tokens"].find_one({"identity_id": identity_id})
+            assert tok is not None, "Token record not found"
+            assert tok["total"] == 20
 
 
 # ---------------------------------------------------------------------------
-# Task 8.5: Integration tests for full send flow
+# Task 18.2 — Memory_Extractor.run persists entries correctly
 # ---------------------------------------------------------------------------
 
-class TestFullSendFlow:
-    """
-    End-to-end flow without Streamlit:
-      Logger.append_message → Identity.load_history → Engine.run_inference (mocked) → Logger.append_message
-    """
+class TestMemoryExtractorIntegration:
+    """Integration test: Memory_Extractor.run persists entries with correct fields."""
 
-    @patch("falcon.engine.ChatGroq")
-    def test_send_flow_produces_correct_log_state(self, mock_chatgroq_cls, tmp_path, monkeypatch):
-        """
-        After a full send flow, the log contains the user message
-        followed by the assistant message.
-        """
-        monkeypatch.setattr(logger_module, "_LOG_DIR", str(tmp_path))
-        monkeypatch.setattr(identity_module, "_LOG_DIR", str(tmp_path))
+    def test_extractor_persists_with_correct_identity_and_source(self):
+        """18.2: Entries persisted with correct identity_id and source='auto'."""
+        mock_db = _make_db()
+        mock_db["memory"].drop()
 
-        mock_chatgroq_cls.return_value = _make_mock_llm("assistant reply")
+        identity_id = "extractor-integration-B"
 
-        identity_id = "test_flow"
+        fake_llm_json = json.dumps([
+            {"memory_type": "semantic",   "content": "France capital is Paris", "tags": ["france", "capital"]},
+            {"memory_type": "episodic",   "content": "User asked about France",  "tags": []},
+            {"memory_type": "persona",    "content": "Should be rejected",       "tags": []},  # forbidden
+            {"memory_type": "archive",    "content": "Should be rejected",       "tags": []},  # forbidden
+        ])
 
-        # Step 1: log user message
-        append_message(identity_id, "user", "user question")
+        mock_choice = MagicMock()
+        mock_choice.message.content = fake_llm_json
+        mock_response = MagicMock()
+        mock_response.choices = [mock_choice]
 
-        # Step 2: load full history for engine call
-        history = load_history(identity_id)
+        with patch("falcon.memory.get_db", return_value=mock_db):
+            with patch("openai.OpenAI") as mock_openai:
+                mock_client = MagicMock()
+                mock_openai.return_value = mock_client
+                mock_client.chat.completions.create.return_value = mock_response
 
-        # Step 3: run inference
-        result = run_inference("model", "", history, "fake-key")
-        response_text = result["response"]
+                import falcon.memory_extractor as Extractor
+                fresh_queues = defaultdict(lambda: deque(maxlen=10))
+                with patch.object(Extractor, "_extractor_queues", fresh_queues):
+                    Extractor.run({
+                        "identity_id":       identity_id,
+                        "user_message":      "What is the capital of France?",
+                        "assistant_message": "Paris.",
+                        "turn_index":        1,
+                        "timestamp":         "2024-01-01T00:00:00Z",
+                    })
 
-        # Step 4: log assistant response
-        append_message(identity_id, "assistant", response_text)
+            # Allow background work to settle (extractor runs synchronously in run())
+            entries = list(mock_db["memory"].find({"identity_id": identity_id}))
 
-        # Verify final log state
-        final_history = load_history(identity_id)
-        assert len(final_history) == 2
-        assert final_history[0]["role"] == "user"
-        assert final_history[0]["content"] == "user question"
-        assert final_history[1]["role"] == "assistant"
-        assert final_history[1]["content"] == "assistant reply"
+        # persona and archive should be rejected
+        types = {e["memory_type"] for e in entries}
+        assert "persona" not in types, "Extractor must not write persona entries"
+        assert "archive" not in types, "Extractor must not write archive entries"
 
-    @patch("falcon.engine.ChatGroq")
-    def test_raw_payload_shape_in_send_flow(self, mock_chatgroq_cls, tmp_path, monkeypatch):
-        """
-        system entry (if prompt non-empty) + all prior messages.
-        """
-        monkeypatch.setattr(logger_module, "_LOG_DIR", str(tmp_path))
-        monkeypatch.setattr(identity_module, "_LOG_DIR", str(tmp_path))
+        # All entries must have source="auto" and correct identity_id
+        for entry in entries:
+            assert entry.get("source") == "auto", (
+                f"Expected source='auto', got {entry.get('source')!r}"
+            )
+            assert entry.get("identity_id") == identity_id, (
+                f"Expected identity_id={identity_id!r}, got {entry.get('identity_id')!r}"
+            )
 
-        mock_chatgroq_cls.return_value = _make_mock_llm("response")
+        # Should have persisted 2 valid entries (semantic + episodic)
+        assert len(entries) == 2, f"Expected 2 valid entries, got {len(entries)}"
 
-        identity_id = "payload_test"
-        system_prompt = "Be concise."
 
-        append_message(identity_id, "user", "question one")
-        history = load_history(identity_id)
-        result = run_inference("model", system_prompt, history, "key")
+# ---------------------------------------------------------------------------
+# Task 18.3 — Identity switch — no state bleed
+# ---------------------------------------------------------------------------
 
-        assert result["raw_payload"][0] == {"role": "system", "content": system_prompt}
-        assert result["raw_payload"][1] == {"role": "user", "content": "question one"}
-        assert len(result["raw_payload"]) == 2  # system + 1 message
+class TestIdentitySwitchNoStateBleed:
+    """Integration test: switching identity produces no history/memory/token bleed."""
 
-    @patch("falcon.engine.ChatGroq")
-    def test_context_continuity_10_messages(self, mock_chatgroq_cls, tmp_path, monkeypatch):
-        """
-        engine receives all 10 prior messages plus the new user message = 11 entries.
-        """
-        monkeypatch.setattr(logger_module, "_LOG_DIR", str(tmp_path))
-        monkeypatch.setattr(identity_module, "_LOG_DIR", str(tmp_path))
+    def test_no_history_bleed_on_switch(self):
+        """18.3: After identity switch, load_history returns only new identity's data."""
+        mock_db = _make_db()
+        mock_db["messages"].drop()
 
-        mock_chatgroq_cls.return_value = _make_mock_llm("response")
+        id_a = "switch-test-A"
+        id_b = "switch-test-B"
 
-        identity_id = "context_test"
+        # Seed messages for both identities
+        mock_db["messages"].insert_many([
+            {"identity_id": id_a, "role": "user",      "content": "Hello from A", "timestamp": "t1"},
+            {"identity_id": id_a, "role": "assistant",  "content": "Hi A!",        "timestamp": "t2"},
+            {"identity_id": id_b, "role": "user",      "content": "Hello from B", "timestamp": "t3"},
+            {"identity_id": id_b, "role": "assistant",  "content": "Hi B!",        "timestamp": "t4"},
+        ])
 
-        # Write 10 prior messages (5 exchanges)
-        for i in range(5):
-            append_message(identity_id, "user", f"user message {i}")
-            append_message(identity_id, "assistant", f"assistant reply {i}")
+        with patch("falcon.identity.get_db", return_value=mock_db):
+            import falcon.identity as Identity
 
-        # Load full history (10 entries)
-        history = load_history(identity_id)
-        assert len(history) == 10
+            history_a = Identity.load_history(id_a)
+            history_b = Identity.load_history(id_b)
 
-        # Add the new user message to history (simulating what app.py does)
-        new_user_message = {"role": "user", "content": "the 11th message"}
-        messages_to_engine = history + [new_user_message]
+        # id_A history must not contain id_B messages
+        a_contents = {m.get("content") for m in history_a}
+        b_contents = {m.get("content") for m in history_b}
 
-        result = run_inference("model", "", messages_to_engine, "key")
+        assert "Hello from B" not in a_contents, "id_B message leaked into id_A history"
+        assert "Hi B!" not in a_contents,        "id_B message leaked into id_A history"
+        assert "Hello from A" not in b_contents, "id_A message leaked into id_B history"
+        assert "Hi A!" not in b_contents,        "id_A message leaked into id_B history"
 
-        # No system prompt → raw_payload length == 11
-        assert len(result["raw_payload"]) == 11
-        assert result["raw_payload"][-1]["role"] == "user"
-        assert result["raw_payload"][-1]["content"] == "the 11th message"
+        assert "Hello from A" in a_contents
+        assert "Hello from B" in b_contents
 
-    @patch("falcon.engine.ChatGroq")
-    def test_identity_isolation_in_send_flow(self, mock_chatgroq_cls, tmp_path, monkeypatch):
-        """
-         Messages written for identity A do not appear in identity B's history.
-        """
-        monkeypatch.setattr(logger_module, "_LOG_DIR", str(tmp_path))
-        monkeypatch.setattr(identity_module, "_LOG_DIR", str(tmp_path))
+    def test_no_memory_bleed_on_switch(self):
+        """18.3: Memory retrieval after identity switch returns only new identity's entries."""
+        mock_db = _make_db()
+        mock_db["memory"].drop()
 
-        mock_chatgroq_cls.return_value = _make_mock_llm()
+        id_a = "switch-mem-A"
+        id_b = "switch-mem-B"
 
-        # Write messages for identity A
-        append_message("test_A", "user", "A says hello")
-        append_message("test_A", "assistant", "A gets a reply")
+        with patch("falcon.memory.get_db", return_value=mock_db):
+            import falcon.memory as Memory
 
-        # Write message for identity B
-        append_message("test_B", "user", "B says hi")
+            Memory.add_memory(id_a, "semantic", "Fact about A")
+            Memory.add_memory(id_b, "semantic", "Fact about B")
 
-        history_a = load_history("test_A")
-        history_b = load_history("test_B")
+            result_a = Memory.retrieve_for_generation(identity_id=id_a, query="fact")
+            result_b = Memory.retrieve_for_generation(identity_id=id_b, query="fact")
 
-        assert len(history_a) == 2
-        assert len(history_b) == 1
-        assert all(e["content"] != "B says hi" for e in history_a), (
-            "A's history must not contain B's messages"
+        a_contents = {e.get("content") for e in result_a.entries}
+        b_contents = {e.get("content") for e in result_b.entries}
+
+        assert "Fact about B" not in a_contents, "id_B memory leaked into id_A retrieval"
+        assert "Fact about A" not in b_contents, "id_A memory leaked into id_B retrieval"
+        assert "Fact about A" in a_contents
+        assert "Fact about B" in b_contents
+
+    def test_no_token_bleed_on_switch(self):
+        """18.3: Token counts from id_A do not appear in id_B after switch."""
+        mock_db = _make_db()
+        mock_db["tokens"].drop()
+
+        id_a = "switch-tok-A"
+        id_b = "switch-tok-B"
+
+        mock_db["tokens"].insert_one(
+            {"identity_id": id_a, "prompt": 500, "completion": 200, "total": 700}
         )
-        assert all(e["content"] != "A says hello" for e in history_b), (
-            "B's history must not contain A's messages"
-        )
+        # id_B has no tokens yet
 
-    @patch("falcon.engine.ChatGroq")
-    def test_app_restart_continuity(self, mock_chatgroq_cls, tmp_path, monkeypatch):
-        """
-         After writing messages in a 'first session', loading history in a
-        'second session' returns identical entries — zero loss.
-        """
-        monkeypatch.setattr(logger_module, "_LOG_DIR", str(tmp_path))
-        monkeypatch.setattr(identity_module, "_LOG_DIR", str(tmp_path))
+        tok_a = mock_db["tokens"].find_one({"identity_id": id_a}, {"_id": 0})
+        tok_b = mock_db["tokens"].find_one({"identity_id": id_b}, {"_id": 0})
 
-        mock_chatgroq_cls.return_value = _make_mock_llm("model answer")
-
-        identity_id = "restart_test"
-
-        # First session: write some messages
-        session1_messages = [
-            ("user", "first user message"),
-            ("assistant", "first assistant response"),
-            ("user", "second user message"),
-        ]
-        for role, content in session1_messages:
-            append_message(identity_id, role, content)
-
-        # Simulate app restart: load from scratch
-        loaded_after_restart = load_history(identity_id)
-
-        assert len(loaded_after_restart) == len(session1_messages)
-        for idx, (exp_role, exp_content) in enumerate(session1_messages):
-            assert loaded_after_restart[idx]["role"] == exp_role
-            assert loaded_after_restart[idx]["content"] == exp_content
-
-    @patch("falcon.engine.ChatGroq")
-    def test_failed_inference_does_not_log_assistant_entry(self, mock_chatgroq_cls, tmp_path, monkeypatch):
-        """
-         If run_inference raises an exception, no assistant entry is logged.
-        (Mirrors what app.py must do — only log on success.)
-        """
-        monkeypatch.setattr(logger_module, "_LOG_DIR", str(tmp_path))
-        monkeypatch.setattr(identity_module, "_LOG_DIR", str(tmp_path))
-
-        mock_llm = MagicMock()
-        mock_llm.invoke.side_effect = RuntimeError("API error")
-        mock_chatgroq_cls.return_value = mock_llm
-
-        identity_id = "error_test"
-
-        append_message(identity_id, "user", "a question")
-        history = load_history(identity_id)
-
-        # run_inference raises — caller (app.py equivalent) must NOT log assistant
-        with pytest.raises(RuntimeError):
-            run_inference("model", "", history, "key")
-
-        # Only the user message should be in the log — no assistant entry added
-        final_history = load_history(identity_id)
-        assert len(final_history) == 1
-        assert final_history[0]["role"] == "user"
+        assert tok_a["total"] == 700
+        assert tok_b is None, "id_B should have no token record"

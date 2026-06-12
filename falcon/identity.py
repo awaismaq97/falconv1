@@ -1,21 +1,20 @@
 """
 Identity Manager module for Falcon V1.
 
-Provides three operations over per-identity log files:
-  - list_identities()  — enumerate all identities that have log files
-  - load_history()     — load the message history for a given identity
-  - clear_identity()   — delete the log file for a given identity
+Provides operations over per-identity data:
+  - list_identities()   — enumerate all identities (from the identities collection + messages)
+  - create_identity()   — persist a new identity immediately (before any messages)
+  - load_history()      — load the message history for a given identity
+  - clear_identity()    — delete all messages for a given identity
 
-Log files live at logs/{identity_id}.json, using the same _LOG_DIR constant
-as logger.py.  The two modules must agree on this path at all times.
+Data lives in:
+  - MongoDB 'identities' collection  — one doc per identity, written on creation
+  - MongoDB 'messages'   collection  — conversation history, scoped by identity_id
 """
 
-import glob
-import json
-import os
+from datetime import datetime, timezone
 
-# Must match logger._LOG_DIR — both modules read from / write to this directory.
-_LOG_DIR = "logs"
+from falcon.db import get_db
 
 # Forbidden characters / sequences in identity_id values.
 _FORBIDDEN_CHARS = ("/", "\\")
@@ -49,24 +48,43 @@ def _validate_identity_id(identity_id: str) -> None:
 
 
 def list_identities() -> list[str]:
-    """Return all identity IDs that currently have a log file in logs/.
+    """Return all identity IDs — from the identities collection union messages.
 
-    Each identity ID is derived from its filename:
-        logs/alice.json  →  "alice"
-
-    Returns an empty list if the logs/ directory does not exist or is empty.
-
-     — each ID appears exactly once.
-     — only IDs whose log file currently exists are included.
+    This ensures identities created before their first message are included.
+    Returns an empty list if no identities exist at all.
+    Each ID appears exactly once.
     """
-    pattern = os.path.join(_LOG_DIR, "*.json")
-    paths = glob.glob(pattern)
-    identities: list[str] = []
-    for path in paths:
-        basename = os.path.basename(path)          # e.g. "alice.json"
-        identity_id, _ = os.path.splitext(basename)  # e.g. "alice"
-        identities.append(identity_id)
-    return identities
+    db = get_db()
+    from_registry = set(
+        doc["identity_id"]
+        for doc in db["identities"].find({}, {"identity_id": 1, "_id": 0})
+    )
+    from_messages = set(db["messages"].distinct("identity_id"))
+    return sorted(from_registry | from_messages)
+
+
+def create_identity(identity_id: str) -> None:
+    """Persist a new identity immediately, before any messages are sent.
+
+    Inserts a document into the 'identities' collection so the identity
+    shows up in list_identities() right away without needing a first message.
+    No-op if the identity already exists.
+
+    Args:
+        identity_id: The new identity name.
+
+    Raises:
+        ValueError: If identity_id contains forbidden characters.
+    """
+    _validate_identity_id(identity_id)
+
+    db  = get_db()
+    now = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+    db["identities"].update_one(
+        {"identity_id": identity_id},
+        {"$setOnInsert": {"identity_id": identity_id, "created_at": now}},
+        upsert=True,
+    )
 
 
 def load_history(identity_id: str) -> list[dict]:
@@ -74,13 +92,12 @@ def load_history(identity_id: str) -> list[dict]:
 
     Behaviour:
     - Validates identity_id for path-traversal characters.
-    - Returns an empty list [] if no log file exists for this identity.
-    - Raises json.JSONDecodeError if the log file exists but is not valid JSON,
-      without modifying the file.
-    - Returns entries in the order they were appended — chronological order is
-      preserved because logger.py always appends to the end.
-    - Returns a shallow copy of the list so the caller cannot mutate the
-      internal state (defensive copy per design spec).
+    - Returns an empty list [] if no messages exist for this identity.
+    - Returns entries in insertion order (natural MongoDB order), which is
+      the same chronological order the previous file-based logger used.
+    - Each entry is a plain dict with keys: timestamp, role, content.
+      The MongoDB _id field is stripped so the shape is identical to the
+      old JSON format callers expect.
 
     Args:
         identity_id: The identity whose history to load.
@@ -90,44 +107,33 @@ def load_history(identity_id: str) -> list[dict]:
 
     Raises:
         ValueError: If identity_id contains forbidden characters.
-        json.JSONDecodeError: If the log file exists but is not valid JSON.
     """
     _validate_identity_id(identity_id)
 
-    log_path = os.path.join(_LOG_DIR, f"{identity_id}.json")
-
-    if not os.path.exists(log_path):
-        return []
-
-    with open(log_path, "r", encoding="utf-8") as fh:
-        raw = fh.read()
-
-    # Raises json.JSONDecodeError if the file is not valid JSON — we do not
-    # catch this; the caller (app.py) is responsible for surfacing the error.
-    entries: list[dict] = json.loads(raw)
-
-    # Return a copy so the caller cannot inadvertently mutate logged history.
-    return list(entries)
+    db = get_db()
+    cursor = db["messages"].find(
+        {"identity_id": identity_id},
+        {"_id": 0, "identity_id": 0},   # strip internal fields
+    )
+    return list(cursor)
 
 
 def clear_identity(identity_id: str) -> None:
-    """Delete the log file for identity_id.
+    """Delete all messages for identity_id from MongoDB.
 
     Behaviour:
     - Validates identity_id for path-traversal characters.
-    - Deletes logs/{identity_id}.json if it exists.
-    - No-op if the file does not exist — does not raise.
-    - Does NOT affect any other identity's log file.
+    - Deletes all documents where identity_id matches.
+    - No-op if no documents exist — does not raise.
+    - Does NOT affect any other identity's messages.
 
     Args:
-        identity_id: The identity whose log file should be deleted.
+        identity_id: The identity whose messages should be deleted.
 
     Raises:
         ValueError: If identity_id contains forbidden characters.
     """
     _validate_identity_id(identity_id)
 
-    log_path = os.path.join(_LOG_DIR, f"{identity_id}.json")
-
-    if os.path.exists(log_path):
-        os.remove(log_path)
+    db = get_db()
+    db["messages"].delete_many({"identity_id": identity_id})

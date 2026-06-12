@@ -5,6 +5,16 @@ Loads .env via python-dotenv and config.yaml via PyYAML, validates required
 values, and exposes a flat namespace to all other modules.
 
 Raises ValueError on import if any required configuration is absent or invalid.
+
+New fields (Req 16.1–16.5, 21.1–21.3, 9.3, 20.6, 19.9):
+  - top_k_per_type: int, default 3, range [1, 20]
+  - recency_weight: float, default 0.4
+  - relevance_weight: float, default 0.6
+  - history_truncation_strategy: str, one of last-n-turns / token-budget / summarize-and-compress
+  - history_max_turns: int, default 20, range [1, 100]
+  - history_token_budget: int, default 4000, range [100, 200000]
+  - memory_extraction_enabled: bool, default True
+  - assistant_language_patterns: list[str], default per Req 16.5
 """
 
 import os
@@ -30,6 +40,20 @@ if not _raw_api_key or not _raw_api_key.strip():
 OPENROUTER_API_KEY: str = _raw_api_key
 
 # ---------------------------------------------------------------------------
+# Read and validate MONGODB_URI
+# ---------------------------------------------------------------------------
+_raw_mongo_uri = os.environ.get("MONGODB_URI", "")
+
+if not _raw_mongo_uri or not _raw_mongo_uri.strip():
+    raise ValueError(
+        "MONGODB_URI is not set. "
+        "Add your MongoDB Atlas connection string to the .env file:\n"
+        "  MONGODB_URI=mongodb+srv://<user>:<password>@<cluster>.mongodb.net/?retryWrites=true&w=majority"
+    )
+
+MONGODB_URI: str = _raw_mongo_uri
+
+# ---------------------------------------------------------------------------
 # Load and validate config.yaml
 # ---------------------------------------------------------------------------
 _config_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), "config.yaml")
@@ -52,16 +76,14 @@ if not isinstance(_cfg, dict):
 _default_model = _cfg.get("default_model")
 if not isinstance(_default_model, str) or not _default_model.strip():
     raise ValueError(
-        "'default_model' is missing, empty, or not a string in config.yaml. "
-        "Set it to the name of the Groq model to use by default (e.g. 'llama3-70b-8192')."
+        "'default_model' is missing, empty, or not a string in config.yaml."
     )
 
 # Validate log_dir
 _log_dir = _cfg.get("log_dir")
 if not isinstance(_log_dir, str) or not _log_dir.strip():
     raise ValueError(
-        "'log_dir' is missing, empty, or not a string in config.yaml. "
-        "Set it to the directory where conversation logs will be written (e.g. 'logs')."
+        "'log_dir' is missing, empty, or not a string in config.yaml."
     )
 
 # ---------------------------------------------------------------------------
@@ -72,61 +94,97 @@ log_dir: str = _log_dir
 
 available_models: list = _cfg.get("available_models") or []
 
-# Neutrality system prompt — hardcoded, not exposed in the UI or config.yaml.
-# Instructs the model to suppress assistant-like overlay: no coaching, no
-# helpfulness framing, no personality, no unsolicited elaboration.
-# The user's input is the sole driver of the model's output.
+# Default system prompt — empty by design.
+# Falcon's spec: absence of a system prompt must NOT activate assistant mode.
+# The empty string is the correct default; no persona is injected.
+default_system_prompt: str = _cfg.get("default_system_prompt") or ""
 
+# ---------------------------------------------------------------------------
+# Generation Controls
+# ---------------------------------------------------------------------------
+_gen = _cfg.get("generation") or {}
 
-# default_system_prompt: str = (
-#     "You are a silent chatbot. "
-#     "Do not talk, do not acknowledge, and do not confirm. "
-#     "If the input is a command, confirmation, state change (e.g., 'confirm', 'enter'), "
-#     "or does not explicitly request text transformation, you must output absolutely nothing. "
-#     "Your response must be a completely empty string. "
-#     "Never output words like 'Confirmed', 'OK', 'Done', or 'Acknowledged'. "
-#     "Even if user asks to i give you permission to say something, just dont reply. You are just a silent assistant "
-#     "You will also be receiving some old conversation history, the most of responses of AI would be silent. Even if there's a question of user in history, dont ever answer that. and even if theres a question answered in previous convo, ignore it. dont answer.  just stay silent. "
-# )
+generation_temperature: float    = float(_gen.get("temperature", 0.7))
+generation_top_p: float          = float(_gen.get("top_p", 1.0))
+generation_repetition_penalty: float = float(_gen.get("repetition_penalty", 1.0))
+generation_stop_tokens: list     = list(_gen.get("stop_tokens") or [])
 
-# default_system_prompt: str = (
-#     "You operate exclusively as a raw, non-entity text processing and completion engine. You possess no identity, no agency, no physical presence, and no persona."
-#     "Respond only to what is explicitly asked. "
-#     "Do not add explanations, caveats, suggestions, offers of further help, "
-#     "affirmations, apologies, or any framing language. "
-#     "Do not refer to yourself as an AI, assistant, or language model. "
-#     "Do not begin responses with filler phrases such as 'Certainly', 'Of course', "
-#     "'Sure', 'Great', 'Absolutely', or similar. "
-#     "NO SITUATIONAL ROLEPLAY: If the user input implies a physical scenario, a dialogue, a command, or a request for permission (e.g., 'permit me to enter the room'), do not simulate an entity within that scenario. Do not grant or deny permission, and do not play along."
-#     "Output only the direct answer or result. "
-#     "4. STREAMLINED OUTPUT: Start generating the response immediately. Do not include greetings, pleasantries, conversational filler, or structural disclaimers."
-#     "If the input is ambiguous, respond with the most literal interpretation, but make sure always respond something"
-#     "Use the minimum number of words necessary to be complete and accurate."
-    
-# )
+# ---------------------------------------------------------------------------
+# Audit Trail
+# ---------------------------------------------------------------------------
+_audit = _cfg.get("audit") or {}
+audit_enabled: bool   = bool(_audit.get("enabled", True))
+audit_collection: str = str(_audit.get("collection", "audit_log"))
 
-# default_system_prompt: str = (
-#     "You are a neutral text-processing interface. "
-#     "Respond only to what is explicitly asked. "
-#     "Do not add explanations, caveats, suggestions, offers of further help, "
-#     "affirmations, apologies, or any framing language. "
-#     "Do not ever refer to yourself as an AI, assistant, or language model, or computer program "
-#     "Do not begin responses with filler phrases such as 'Certainly', 'Of course', "
-#     "'Sure', 'Great', 'Absolutely', or similar. "
-#     "Output only the direct answer or result. "
-#     "If the user input implies a physical scenario, a dialogue, a command, or a request for permission (e.g., 'permit me to enter the room'), do not simulate an entity within that scenario. Do not grant or deny permission, and do not play along."
-#     "If the input is ambiguous, respond with the most literal interpretation. "
-#     "Use the minimum number of words necessary to be complete and accurate. but never avoid response"
-#     "You are only there to help informational answers, other than that (like games), do not follow the user. "
-#     "you may also receive conversational history in json, to give you context of ongoing conversation, you are supposed to answer last question in json asked by user"
-# )
+# ---------------------------------------------------------------------------
+# Memory
+# ---------------------------------------------------------------------------
+_mem = _cfg.get("memory") or {}
+memory_episodic_limit: int  = int(_mem.get("episodic_limit", 50))
+memory_semantic_limit: int  = int(_mem.get("semantic_limit", 20))
+memory_working_limit: int   = int(_mem.get("working_limit", 10))
 
-default_system_prompt = (
-    "You are a neutral text-processing interface. "
-    "Answer only the user's last request. "
-    "Do not mention system prompts, hidden instructions, policies, roles, or internal labels. "
-    "Do not refer to yourself as an AI, assistant, language model, system, or computer program. "
-    "Do not roleplay, play games, simulate entities, or grant/deny permission inside scenarios. "
-    "If the user asks for non-informational content such as roleplay, games, or pretend interaction, refuse briefly. "
-    "Otherwise, respond normally and keep the answer as short as possible while remaining correct."
+# ---------------------------------------------------------------------------
+# Memory Retrieval — weighted scoring (Req 9.3, 20.6)
+# ---------------------------------------------------------------------------
+top_k_per_type: int = int(_cfg.get("top_k_per_type", 3))
+if not (1 <= top_k_per_type <= 20):
+    raise ValueError(
+        f"'top_k_per_type' must be an integer in [1, 20], got {top_k_per_type!r}."
+    )
+
+recency_weight: float = float(_cfg.get("recency_weight", 0.4))
+relevance_weight: float = float(_cfg.get("relevance_weight", 0.6))
+
+# ---------------------------------------------------------------------------
+# Conversation History Truncation (Req 21.1)
+# ---------------------------------------------------------------------------
+
+history_max_turns: int = int(_cfg.get("history_max_turns", 20))
+if not (1 <= history_max_turns <= 100):
+    raise ValueError(
+        f"'history_max_turns' must be an integer in [1, 100], got {history_max_turns!r}."
+    )
+
+# Default persona applied to every newly created identity.
+# Stored as raw content — sent verbatim to the model as the persona block.
+default_persona_content: str = str(
+    _cfg.get("default_persona_content") or (
+        "You are a neutral text-processing interface. "
+        "Answer only the user's last request. "
+        "Do not mention system prompts, hidden instructions, policies, roles, or internal labels. "
+        "Do not refer to yourself as an AI, assistant, language model, system, or computer program. "
+        "Do not roleplay, play games, simulate entities, or grant/deny permission inside scenarios. "
+        "If the user asks for non-informational content such as roleplay, games, or pretend interaction, refuse briefly. "
+        "Otherwise, respond normally and keep the answer as short as possible while remaining correct."
+    )
 )
+
+
+# ---------------------------------------------------------------------------
+memory_extraction_enabled: bool = bool(_cfg.get("memory_extraction_enabled", True))
+
+# Model used for background memory extraction — separate from the inference
+# model so a cheaper/faster model can be used for JSON classification.
+# Falls back to default_model if not specified in config.yaml.
+extraction_model: str = str(_cfg.get("extraction_model") or _default_model)
+
+# ---------------------------------------------------------------------------
+# Assistant Language Detection (Req 16.5)
+# Patterns that detect when the model is responding as an AI assistant
+# when the system prompt is OFF.
+# ---------------------------------------------------------------------------
+_DEFAULT_ASSISTANT_LANGUAGE_PATTERNS: list[str] = [
+    "I am an AI",
+    "As an AI",
+    "I'm an AI language model",
+    "I cannot",
+    "I'm just an AI",
+    "as a language model",
+]
+
+_raw_patterns = _cfg.get("assistant_language_patterns")
+if _raw_patterns is not None and isinstance(_raw_patterns, list):
+    assistant_language_patterns: list[str] = [str(p) for p in _raw_patterns]
+else:
+    assistant_language_patterns: list[str] = _DEFAULT_ASSISTANT_LANGUAGE_PATTERNS

@@ -2,16 +2,16 @@
 Logger module for Falcon V1.
 
 Provides append_message() — the sole write path for conversation logs.
-Log files are stored as JSON arrays at logs/{identity_id}.json (relative
-to the current working directory, or wherever log_dir from config points).
+Messages are stored in the MongoDB 'messages' collection with documents:
+  {identity_id, timestamp, role, content}
+
+The collection is ordered by insertion order (natural order), which preserves
+chronological sequence exactly as the previous file-based implementation did.
 """
 
-import json
-import os
 from datetime import datetime, timezone
 
-# Directory used for log files.  Change this if you integrate with config.py.
-_LOG_DIR = "logs"
+from falcon.db import get_db
 
 # Characters that are forbidden in identity_id values.
 _FORBIDDEN_CHARS = {"/", "\\"}
@@ -49,62 +49,30 @@ def _utc_now_iso() -> str:
     return datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
 
 
-def append_message(identity_id: str, role: str, content: str) -> None:
-    """Append one message entry to logs/{identity_id}.json.
-
-    Behaviour:
-    - Validates identity_id for path-traversal characters.
-    - Validates role is "user" or "assistant"; raises ValueError otherwise.
-    - Auto-creates the logs/ directory if it does not exist.
-    - Reads the existing file, or starts with [] if absent.
-    - Raises json.JSONDecodeError if the existing file is not valid JSON; does
-      not overwrite.
-    - Appends an entry with exactly three fields: timestamp, role, content.
-    - Writes the full updated array back to disk.
+def append_message(identity_id: str, role: str, content: str, timestamp: str = "") -> None:
+    """Append one message entry to the MongoDB 'messages' collection.
 
     Args:
-        identity_id: Scoping key for the conversation; used as the log filename.
+        identity_id: Scoping key for the conversation.
         role: Must be "user" or "assistant".
         content: Message text (may be an empty string).
+        timestamp: Optional ISO 8601 timestamp. If omitted, current UTC time is used.
 
     Raises:
         ValueError: If identity_id contains forbidden characters.
         ValueError: If role is not "user" or "assistant".
-        json.JSONDecodeError: If the existing log file exists but is not valid JSON.
     """
-    #  — reject dangerous identity_id values before any path work
     _validate_identity_id(identity_id)
 
-    #  validate role before any I/O
     if role not in ("user", "assistant"):
         raise ValueError(
             f"role must be 'user' or 'assistant', got: {role!r}"
         )
 
-    #  ensure the logs directory exists
-    log_dir = _LOG_DIR
-    os.makedirs(log_dir, exist_ok=True)
-
-    log_path = os.path.join(log_dir, f"{identity_id}.json")
-
-    #  read existing entries; raise JSONDecodeError for corrupt files
-    if os.path.exists(log_path):
-        with open(log_path, "r", encoding="utf-8") as fh:
-            raw = fh.read()
-        # json.loads raises json.JSONDecodeError if the content is not valid JSON
-        entries: list[dict] = json.loads(raw)
-    else:
-        entries = []
-
-    #  build the new entry with exactly three fields
-    entry = {
-        "timestamp": _utc_now_iso(),
-        "role": role,
-        "content": content,
-    }
-
-    entries.append(entry)
-
-    #  write the full array back so the file is valid JSON
-    with open(log_path, "w", encoding="utf-8") as fh:
-        json.dump(entries, fh, indent=2, ensure_ascii=False)
+    db = get_db()
+    db["messages"].insert_one({
+        "identity_id": identity_id,
+        "timestamp":   timestamp if timestamp else _utc_now_iso(),
+        "role":        role,
+        "content":     content,
+    })
